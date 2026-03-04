@@ -80,7 +80,9 @@
               "api/people",
               "api/songs",
               "api/playlists",
+              "api/instruments",
               "api/calendar",
+              "api/attendance",
               "api/reports"
             ]
           }

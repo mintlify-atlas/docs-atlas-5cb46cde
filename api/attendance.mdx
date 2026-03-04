@@ -1,0 +1,334 @@
+---
+title: "Attendance API"
+description: "Track service attendance and manage visitor information for the Ushers service"
+icon: "clipboard-check"
+---
+
+The Attendance API enables ushers to track attendance counts (adults and children) for meetings and log visitor information for follow-up.
+
+## Authentication
+
+All attendance endpoints require authentication via JWT token and appropriate permissions:
+- `church.read` - Required for viewing attendance
+- `reunions.view` - Required for recording attendance and visitors
+
+<Info>Pass the JWT token in the `Authorization` header as `Bearer YOUR_TOKEN`</Info>
+
+## Get Attendance
+
+Retrieve attendance count and visitor list for a specific meeting.
+
+```bash
+GET /api/attendance?meeting_id={meetingId}
+```
+
+<ParamField query="meeting_id" type="number" required>
+  The ID of the meeting to retrieve attendance for
+</ParamField>
+
+<ParamField query="church_id" type="number">
+  The church ID (optional, determined from user context if not provided)
+</ParamField>
+
+### Response
+
+<ResponseField name="success" type="boolean">
+  Whether the request was successful
+</ResponseField>
+
+<ResponseField name="count" type="object">
+  Attendance count object
+  
+  <Expandable title="count properties">
+    <ResponseField name="adults" type="number">
+      Number of adults present
+    </ResponseField>
+    
+    <ResponseField name="children" type="number">
+      Number of children present
+    </ResponseField>
+    
+    <ResponseField name="total" type="number">
+      Total attendance (adults + children)
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="visitors" type="array">
+  Array of visitor objects
+  
+  <Expandable title="visitor properties">
+    <ResponseField name="id" type="number">
+      Visitor ID
+    </ResponseField>
+    
+    <ResponseField name="first_name" type="string">
+      Visitor's first name
+    </ResponseField>
+    
+    <ResponseField name="last_name" type="string">
+      Visitor's last name
+    </ResponseField>
+    
+    <ResponseField name="phone" type="string">
+      Visitor's phone number
+    </ResponseField>
+    
+    <ResponseField name="email" type="string">
+      Visitor's email address
+    </ResponseField>
+    
+    <ResponseField name="notes" type="string">
+      Additional notes about the visitor
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+### Example
+
+```bash cURL
+curl -X GET "https://your-domain.com/api/attendance?meeting_id=123" \
+  -H "Authorization: Bearer YOUR_JWT_TOKEN"
+```
+
+```json Response
+{
+  "success": true,
+  "count": {
+    "adults": 87,
+    "children": 23,
+    "total": 110
+  },
+  "visitors": [
+    {
+      "id": 1,
+      "first_name": "John",
+      "last_name": "Doe",
+      "phone": "+1234567890",
+      "email": "john@example.com",
+      "notes": "Interested in joining the worship team"
+    }
+  ]
+}
+```
+
+## Save Attendance Count
+
+Record or update the attendance count for a meeting.
+
+```bash
+POST /api/attendance/count?meeting_id={meetingId}
+```
+
+<ParamField query="meeting_id" type="number" required>
+  The ID of the meeting to record attendance for
+</ParamField>
+
+### Request Body
+
+<ParamField body="adults" type="number" required>
+  Number of adults present
+</ParamField>
+
+<ParamField body="children" type="number" required>
+  Number of children present
+</ParamField>
+
+### Response
+
+<ResponseField name="success" type="boolean">
+  Whether the count was saved successfully
+</ResponseField>
+
+### Example
+
+```bash cURL
+curl -X POST "https://your-domain.com/api/attendance/count?meeting_id=123" \
+  -H "Authorization: Bearer YOUR_JWT_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "adults": 87,
+    "children": 23
+  }'
+```
+
+```json Response
+{
+  "success": true
+}
+```
+
+## Add Visitor
+
+Log a first-time visitor to a meeting for follow-up.
+
+```bash
+POST /api/attendance/visitor?meeting_id={meetingId}
+```
+
+<ParamField query="meeting_id" type="number" required>
+  The ID of the meeting the visitor attended
+</ParamField>
+
+### Request Body
+
+<ParamField body="first_name" type="string" required>
+  Visitor's first name
+</ParamField>
+
+<ParamField body="last_name" type="string">
+  Visitor's last name
+</ParamField>
+
+<ParamField body="phone" type="string">
+  Visitor's phone number
+</ParamField>
+
+<ParamField body="email" type="string">
+  Visitor's email address
+</ParamField>
+
+<ParamField body="notes" type="string">
+  Additional notes or comments about the visitor
+</ParamField>
+
+### Response
+
+<ResponseField name="success" type="boolean">
+  Whether the visitor was logged successfully
+</ResponseField>
+
+### Example
+
+```bash cURL
+curl -X POST "https://your-domain.com/api/attendance/visitor?meeting_id=123" \
+  -H "Authorization: Bearer YOUR_JWT_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "first_name": "Jane",
+    "last_name": "Smith",
+    "phone": "+1234567890",
+    "email": "jane@example.com",
+    "notes": "Visiting from out of town"
+  }'
+```
+
+```json Response
+{
+  "success": true
+}
+```
+
+## Delete Visitor
+
+Remove a visitor record from the system.
+
+```bash
+DELETE /api/attendance/visitor?id={visitorId}
+```
+
+<ParamField query="id" type="number" required>
+  The ID of the visitor to delete
+</ParamField>
+
+<ParamField query="church_id" type="number">
+  The church ID for permission verification
+</ParamField>
+
+### Response
+
+<ResponseField name="success" type="boolean">
+  Whether the visitor was deleted successfully
+</ResponseField>
+
+### Example
+
+```bash cURL
+curl -X DELETE "https://your-domain.com/api/attendance/visitor?id=1" \
+  -H "Authorization: Bearer YOUR_JWT_TOKEN"
+```
+
+```json Response
+{
+  "success": true
+}
+```
+
+## Get Attendance Report
+
+Retrieve attendance statistics for a church over a date range.
+
+```bash
+GET /api/attendance/report
+```
+
+<ParamField query="church_id" type="number">
+  The church ID (optional, determined from user context if not provided)
+</ParamField>
+
+<ParamField query="start" type="string">
+  Start date in YYYY-MM-DD format (defaults to first day of current month)
+</ParamField>
+
+<ParamField query="end" type="string">
+  End date in YYYY-MM-DD format (defaults to last day of current month)
+</ParamField>
+
+### Response
+
+<ResponseField name="success" type="boolean">
+  Whether the request was successful
+</ResponseField>
+
+<ResponseField name="report" type="array">
+  Array of attendance records with date, adults, children, and total counts
+</ResponseField>
+
+### Example
+
+```bash cURL
+curl -X GET "https://your-domain.com/api/attendance/report?start=2024-01-01&end=2024-01-31" \
+  -H "Authorization: Bearer YOUR_JWT_TOKEN"
+```
+
+```json Response
+{
+  "success": true,
+  "report": [
+    {
+      "date": "2024-01-07",
+      "adults": 95,
+      "children": 28,
+      "total": 123
+    },
+    {
+      "date": "2024-01-14",
+      "adults": 87,
+      "children": 23,
+      "total": 110
+    }
+  ]
+}
+```
+
+## Error Responses
+
+All attendance endpoints may return the following error responses:
+
+| Status | Error | Description |
+|--------|-------|-------------|
+| 400 | Missing meeting_id | The meeting_id parameter is required |
+| 400 | Missing first_name | First name is required when adding a visitor |
+| 401 | Unauthorized | Invalid or missing JWT token |
+| 403 | Forbidden | User lacks required permissions |
+
+## Related APIs
+
+<CardGroup cols={2}>
+  <Card title="Calendar API" icon="calendar" href="/api/calendar">
+    Manage meetings and service scheduling
+  </Card>
+  <Card title="Teams API" icon="users" href="/api/teams">
+    Organize usher teams and assignments
+  </Card>
+</CardGroup>

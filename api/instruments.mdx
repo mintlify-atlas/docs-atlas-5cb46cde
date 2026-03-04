@@ -1,0 +1,171 @@
+---
+title: "Instruments API"
+description: "Manage musical instruments and member instrument assignments"
+icon: "guitar"
+---
+
+The Instruments API allows you to retrieve the list of available instruments and update member instrument proficiencies for worship team coordination.
+
+## Authentication
+
+All instrument endpoints require authentication via JWT token.
+
+<Info>Pass the JWT token in the `Authorization` header as `Bearer YOUR_TOKEN`</Info>
+
+## List Instruments
+
+Retrieve all available instruments in the system.
+
+```bash
+GET /api/instruments
+```
+
+### Response
+
+<ResponseField name="success" type="boolean">
+  Whether the request was successful
+</ResponseField>
+
+<ResponseField name="instruments" type="array">
+  Array of instrument objects
+  
+  <Expandable title="instrument properties">
+    <ResponseField name="id" type="number">
+      Unique instrument ID
+    </ResponseField>
+    
+    <ResponseField name="name" type="string">
+      Instrument name (e.g., "Guitar", "Piano", "Drums")
+    </ResponseField>
+    
+    <ResponseField name="category" type="string">
+      Instrument category (e.g., "Strings", "Percussion", "Vocals")
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+### Example
+
+```bash cURL
+curl -X GET "https://your-domain.com/api/instruments" \
+  -H "Authorization: Bearer YOUR_JWT_TOKEN"
+```
+
+```json Response
+{
+  "success": true,
+  "instruments": [
+    {
+      "id": 1,
+      "name": "Guitar",
+      "category": "Strings"
+    },
+    {
+      "id": 2,
+      "name": "Piano",
+      "category": "Keys"
+    },
+    {
+      "id": 3,
+      "name": "Drums",
+      "category": "Percussion"
+    },
+    {
+      "id": 4,
+      "name": "Bass",
+      "category": "Strings"
+    },
+    {
+      "id": 5,
+      "name": "Lead Vocals",
+      "category": "Vocals"
+    },
+    {
+      "id": 6,
+      "name": "Background Vocals",
+      "category": "Vocals"
+    }
+  ]
+}
+```
+
+## Update My Instruments
+
+Update the list of instruments that the authenticated user can play.
+
+```bash
+POST /api/instruments/mine
+```
+
+### Request Body
+
+<ParamField body="instruments" type="array" required>
+  Array of instrument IDs that the user can play
+</ParamField>
+
+### Response
+
+<ResponseField name="success" type="boolean">
+  Whether the instruments were updated successfully
+</ResponseField>
+
+<ResponseField name="message" type="string">
+  Confirmation message ("Instrumentos actualizados" or error message)
+</ResponseField>
+
+### Example
+
+```bash cURL
+curl -X POST "https://your-domain.com/api/instruments/mine" \
+  -H "Authorization: Bearer YOUR_JWT_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "instruments": [1, 2, 5]
+  }'
+```
+
+```json Response
+{
+  "success": true,
+  "message": "Instrumentos actualizados"
+}
+```
+
+## Common Use Cases
+
+### Worship Team Member Profile
+
+When a member joins the worship team, they can specify which instruments they play:
+
+1. Call `GET /api/instruments` to retrieve all available instruments
+2. Present the list to the user for selection
+3. Call `POST /api/instruments/mine` with the selected instrument IDs
+
+### Assigning Musicians to Services
+
+When creating a setlist or meeting assignment:
+
+1. Query members who have specific instrument proficiencies
+2. Assign appropriate roles (guitarist, pianist, vocalist, etc.)
+3. The instrument assignments are stored and can be referenced when scheduling
+
+## Error Responses
+
+| Status | Error | Description |
+|--------|-------|-------------|
+| 401 | Unauthorized | Invalid or missing JWT token |
+| 400 | Invalid instruments | The instruments array is invalid or empty |
+
+## Related APIs
+
+<CardGroup cols={2}>
+  <Card title="People API" icon="user-group" href="/api/people">
+    Manage team members and their profiles
+  </Card>
+  <Card title="Calendar API" icon="calendar" href="/api/calendar">
+    Schedule worship services with instrument assignments
+  </Card>
+  <Card title="Teams API" icon="users" href="/api/teams">
+    Organize worship teams and roles
+  </Card>
+</CardGroup>
