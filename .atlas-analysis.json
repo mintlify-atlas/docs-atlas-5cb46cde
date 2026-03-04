@@ -1,0 +1,141 @@
+{
+  "projectType": "saas",
+  "projectName": "MinistryHub",
+  "projectDescription": "A professional, multi-tenant church management platform for worship teams, administration, and community engagement.",
+  "theme": "linden",
+  "primaryColor": "#6366f1",
+  "lightColor": "#818cf8",
+  "darkColor": "#4f46e5",
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Documentation",
+        "groups": [
+          {
+            "group": "Get Started",
+            "pages": [
+              "introduction",
+              "quickstart",
+              "architecture"
+            ]
+          },
+          {
+            "group": "Core Features",
+            "pages": [
+              "features/multi-tenancy",
+              "features/worship-module",
+              "features/people-management",
+              "features/calendar-meetings",
+              "features/ushers-service"
+            ]
+          },
+          {
+            "group": "User Guides",
+            "pages": [
+              "guides/getting-started",
+              "guides/admin-guide",
+              "guides/worship-leader",
+              "guides/team-management"
+            ]
+          },
+          {
+            "group": "Deployment",
+            "pages": [
+              "deployment/development",
+              "deployment/production",
+              "deployment/configuration"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "API Reference",
+        "groups": [
+          {
+            "group": "Authentication",
+            "pages": [
+              "api/authentication",
+              "api/jwt-tokens"
+            ]
+          },
+          {
+            "group": "Endpoints",
+            "pages": [
+              "api/churches",
+              "api/areas",
+              "api/teams",
+              "api/people",
+              "api/songs",
+              "api/playlists",
+              "api/calendar",
+              "api/reports"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Technical",
+        "groups": [
+          {
+            "group": "Architecture",
+            "pages": [
+              "technical/stack",
+              "technical/request-lifecycle",
+              "technical/database",
+              "technical/security"
+            ]
+          },
+          {
+            "group": "Frontend",
+            "pages": [
+              "technical/react-structure",
+              "technical/routing",
+              "technical/internationalization"
+            ]
+          },
+          {
+            "group": "Backend",
+            "pages": [
+              "technical/php-architecture",
+              "technical/controllers",
+              "technical/repositories"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "keyFeatures": [
+    "Multi-tenant church management with church switcher",
+    "Worship module with ChordPro support and setlist management",
+    "People and team management with RBAC",
+    "Calendar and meeting scheduling",
+    "Ushers service with attendance tracking and visitor logging",
+    "Internationalization (Spanish, English, Portuguese)",
+    "JWT-based authentication with reCAPTCHA v3",
+    "Activity logs and notification system"
+  ],
+  "publicApiSurface": [
+    "POST /api/auth/login",
+    "POST /api/auth/accept-invite",
+    "GET /api/auth/verify-invite",
+    "GET /api/bootstrap",
+    "GET /api/churches",
+    "POST /api/churches",
+    "GET /api/areas",
+    "POST /api/areas",
+    "GET /api/teams",
+    "POST /api/teams",
+    "GET /api/people",
+    "POST /api/people",
+    "GET /api/songs",
+    "POST /api/songs",
+    "GET /api/playlists",
+    "POST /api/playlists",
+    "GET /api/calendar",
+    "POST /api/calendar",
+    "GET /api/reports",
+    "GET /api/activities",
+    "GET /api/notifications"
+  ]
+}
