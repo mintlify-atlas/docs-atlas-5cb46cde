@@ -1,0 +1,649 @@
+---
+title: 'People API'
+description: 'Manage church members, invitations, and user profiles'
+---
+
+## Overview
+
+The People API manages church members throughout their lifecycle: invitation, approval, profile management, and deletion. It supports both individual and bulk invitation workflows.
+
+## Authentication
+
+All endpoints require authentication with specific permissions:
+
+- **List/View**: `church.update`
+- **Invite**: `users.invite`
+- **Approve**: `users.approve`
+- **Delete**: `users.delete`
+
+```bash
+Authorization: Bearer YOUR_JWT_TOKEN
+```
+
+---
+
+## List People
+
+<Card title="GET /api/people" icon="list">
+  Retrieve all members for a church
+</Card>
+
+**Required Permission:** `church.update`
+
+### Query Parameters
+
+<ParamField query="church_id" type="integer">
+  Filter by church ID. Defaults to authenticated user's church for non-super admins
+</ParamField>
+
+<ParamField query="churchId" type="integer">
+  Alternative parameter for church_id
+</ParamField>
+
+### Request
+
+```bash
+curl -X GET "https://your-domain.com/api/people?church_id=1" \
+  -H "Authorization: Bearer YOUR_TOKEN"
+```
+
+### Response
+
+```json
+{
+  "success": true,
+  "users": [
+    {
+      "id": 5,
+      "name": "John Smith",
+      "email": "john@example.com",
+      "church_id": 1,
+      "role_id": 2,
+      "role_name": "Leader",
+      "status": "active",
+      "created_at": "2024-01-15 10:30:00"
+    },
+    {
+      "id": 8,
+      "name": "Sarah Johnson",
+      "email": "sarah@example.com",
+      "church_id": 1,
+      "role_id": 5,
+      "role_name": "Member",
+      "status": "pending",
+      "created_at": "2024-02-20 14:15:00"
+    }
+  ]
+}
+```
+
+---
+
+## Get Member Details
+
+<Card title="GET /api/people/{id}" icon="user">
+  Retrieve detailed information about a specific member
+</Card>
+
+**Required Permission:** `church.update`
+
+### Request Parameters
+
+<ParamField path="id" type="integer" required>
+  The unique identifier of the member
+</ParamField>
+
+### Request
+
+```bash
+curl -X GET https://your-domain.com/api/people/5 \
+  -H "Authorization: Bearer YOUR_TOKEN"
+```
+
+### Response
+
+```json
+{
+  "success": true,
+  "user": {
+    "id": 5,
+    "name": "John Smith",
+    "email": "john@example.com",
+    "church_id": 1,
+    "role_id": 2,
+    "status": "active",
+    "phone": "+1-555-0123",
+    "address": "123 Main St",
+    "created_at": "2024-01-15 10:30:00",
+    "updated_at": "2024-03-01 09:20:00"
+  }
+}
+```
+
+---
+
+## Get Member's Areas
+
+<Card title="GET /api/people/{id}/areas" icon="folder">
+  Retrieve all areas a member is assigned to
+</Card>
+
+**Required Permission:** `church.update`
+
+### Request
+
+```bash
+curl -X GET https://your-domain.com/api/people/5/areas \
+  -H "Authorization: Bearer YOUR_TOKEN"
+```
+
+### Response
+
+```json
+{
+  "success": true,
+  "areaIds": [1, 2, 5]
+}
+```
+
+---
+
+## Get Member's Groups
+
+<Card title="GET /api/people/{id}/groups" icon="users">
+  Retrieve all teams/groups a member belongs to
+</Card>
+
+**Required Permission:** `church.update`
+
+### Request
+
+```bash
+curl -X GET https://your-domain.com/api/people/5/groups \
+  -H "Authorization: Bearer YOUR_TOKEN"
+```
+
+### Response
+
+```json
+{
+  "success": true,
+  "groupIds": [3, 7, 12]
+}
+```
+
+---
+
+## Invite Member
+
+<Card title="POST /api/people/invite" icon="envelope">
+  Invite a new member to join the church
+</Card>
+
+**Required Permission:** `users.invite`
+
+### Request Body
+
+<ParamField body="name" type="string" required>
+  Full name of the person to invite
+</ParamField>
+
+<ParamField body="email" type="string" required>
+  Email address for the invitation
+</ParamField>
+
+<ParamField body="church_id" type="integer" required>
+  The church ID to invite them to
+</ParamField>
+
+<ParamField body="churchId" type="integer">
+  Alternative parameter for church_id
+</ParamField>
+
+<ParamField body="role_id" type="integer">
+  The role ID to assign (defaults to Member role)
+</ParamField>
+
+<ParamField body="roleId" type="integer">
+  Alternative parameter for role_id
+</ParamField>
+
+### Request
+
+```bash
+curl -X POST https://your-domain.com/api/people/invite \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Emily Davis",
+    "email": "emily@example.com",
+    "church_id": 1,
+    "role_id": 5
+  }'
+```
+
+### Response
+
+```json
+{
+  "success": true,
+  "message": "Member invited successfully",
+  "id": 23
+}
+```
+
+### Process Details
+
+1. Creates a member record with `status: pending`
+2. Generates a secure invitation token (valid for 48 hours)
+3. Assigns the specified role
+4. Sends invitation email with registration link
+5. Logs activity in the system
+
+### Error Responses
+
+**Missing Required Fields (400)**
+```json
+{
+  "success": false,
+  "error": "Name, email and church ID are required"
+}
+```
+
+**Duplicate Email (400)**
+```json
+{
+  "success": false,
+  "error": "Member already exists with this email"
+}
+```
+
+**Server Error (500)**
+```json
+{
+  "success": false,
+  "error": "Error al invitar al integrante. Intente nuevamente."
+}
+```
+
+---
+
+## Bulk Invite Members
+
+<Card title="POST /api/people/invite/bulk" icon="envelopes-bulk">
+  Invite multiple members at once
+</Card>
+
+**Required Permission:** `users.invite`
+
+### Request Body
+
+<ParamField body="emails" type="array" required>
+  Array of email addresses to invite
+</ParamField>
+
+<ParamField body="church_id" type="integer" required>
+  The church ID to invite them to
+</ParamField>
+
+<ParamField body="churchId" type="integer">
+  Alternative parameter for church_id
+</ParamField>
+
+### Request
+
+```bash
+curl -X POST https://your-domain.com/api/people/invite/bulk \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "emails": [
+      "person1@example.com",
+      "person2@example.com",
+      "person3@example.com"
+    ],
+    "church_id": 1
+  }'
+```
+
+### Response
+
+```json
+{
+  "success": 2,
+  "failed": 1,
+  "message": "Process completed: 2 successful, 1 failed"
+}
+```
+
+### Behavior
+
+- Validates each email address
+- Skips emails that already exist in the system
+- Creates member names from email prefixes
+- Assigns default Member role (ID: 5)
+- Sends individual invitation emails
+- Returns count of successful and failed invitations
+
+---
+
+## Approve Member
+
+<Card title="POST /api/people/approve" icon="check">
+  Approve a pending member and activate their account
+</Card>
+
+**Required Permission:** `users.approve`
+
+### Request Body
+
+<ParamField body="role_id" type="integer" required>
+  The role ID to assign upon approval
+</ParamField>
+
+<ParamField body="roleId" type="integer">
+  Alternative parameter for role_id
+</ParamField>
+
+<Note>
+  The member ID should be included in the query string (e.g., `/api/people/approve?action=5`)
+</Note>
+
+### Request
+
+```bash
+curl -X POST https://your-domain.com/api/people/approve?action=8 \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "role_id": 5
+  }'
+```
+
+### Response
+
+```json
+{
+  "success": true,
+  "message": "Member approved successfully"
+}
+```
+
+### Process
+
+1. Changes member status from `pending` to `active`
+2. Assigns the specified role
+3. Creates service role assignment for Church Center
+4. Logs approval activity
+
+### Error Responses
+
+**Missing Parameters (400)**
+```json
+{
+  "success": false,
+  "error": "Member ID and Role ID are required"
+}
+```
+
+**Member Not Found (404)**
+```json
+{
+  "success": false,
+  "error": "Member not found"
+}
+```
+
+---
+
+## Update Member Role
+
+<Card title="PUT /api/people/{id}/role" icon="user-tag">
+  Update a member's role
+</Card>
+
+**Required Permission:** `users.approve`
+
+### Request Parameters
+
+<ParamField path="id" type="integer" required>
+  The member ID
+</ParamField>
+
+<ParamField body="role_id" type="integer" required>
+  The new role ID
+</ParamField>
+
+<ParamField body="roleId" type="integer">
+  Alternative parameter for role_id
+</ParamField>
+
+### Request
+
+```bash
+curl -X PUT https://your-domain.com/api/people/5/role \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "role_id": 2
+  }'
+```
+
+### Response
+
+```json
+{
+  "success": true
+}
+```
+
+---
+
+## Update Member Status
+
+<Card title="PUT /api/people/{id}/status" icon="toggle-on">
+  Update a member's status (active, inactive, pending)
+</Card>
+
+**Required Permission:** `users.approve`
+
+### Request Parameters
+
+<ParamField path="id" type="integer" required>
+  The member ID
+</ParamField>
+
+<ParamField body="status_id" type="integer" required>
+  Status ID: 1 = active, 2 = inactive, 3 = pending
+</ParamField>
+
+<ParamField body="statusId" type="integer">
+  Alternative parameter for status_id
+</ParamField>
+
+### Request
+
+```bash
+curl -X PUT https://your-domain.com/api/people/5/status \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "status_id": 1
+  }'
+```
+
+### Response
+
+```json
+{
+  "success": true
+}
+```
+
+---
+
+## Update Member Profile
+
+<Card title="PUT /api/people/{id}/profile" icon="id-card">
+  Update a member's profile information
+</Card>
+
+**Authorization:** Members can update their own profile, or admins can update any profile
+
+### Request Parameters
+
+<ParamField path="id" type="integer" required>
+  The member ID
+</ParamField>
+
+<ParamField body="name" type="string">
+  Updated name
+</ParamField>
+
+<ParamField body="email" type="string">
+  Updated email
+</ParamField>
+
+<ParamField body="phone" type="string">
+  Updated phone number
+</ParamField>
+
+<ParamField body="address" type="string">
+  Updated address
+</ParamField>
+
+### Request
+
+```bash
+curl -X PUT https://your-domain.com/api/people/5/profile \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "John Michael Smith",
+    "phone": "+1-555-0199",
+    "address": "456 Oak Avenue"
+  }'
+```
+
+### Response
+
+```json
+{
+  "success": true
+}
+```
+
+### Error Responses
+
+**Unauthorized (403)**
+```json
+{
+  "success": false,
+  "error": "Unauthorized"
+}
+```
+
+---
+
+## Delete Invitation
+
+<Card title="DELETE /api/people/invite" icon="xmark">
+  Delete a pending invitation by email
+</Card>
+
+**Required Permission:** `users.invite`
+
+### Request Body
+
+<ParamField body="email" type="string" required>
+  Email address of the invitation to delete
+</ParamField>
+
+### Request
+
+```bash
+curl -X DELETE https://your-domain.com/api/people/invite \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "pending@example.com"
+  }'
+```
+
+### Response
+
+```json
+{
+  "success": true
+}
+```
+
+---
+
+## Delete Member
+
+<Card title="DELETE /api/people/{id}" icon="trash">
+  Permanently delete a member
+</Card>
+
+**Required Permission:** `users.delete`
+
+<Warning>
+  This is a hard delete operation. The member and all associated data will be permanently removed.
+</Warning>
+
+### Request Parameters
+
+<ParamField path="id" type="integer" required>
+  The member ID to delete
+</ParamField>
+
+### Request
+
+```bash
+curl -X DELETE https://your-domain.com/api/people/5 \
+  -H "Authorization: Bearer YOUR_TOKEN"
+```
+
+### Response
+
+```json
+{
+  "success": true
+}
+```
+
+---
+
+## Member Statuses
+
+| Status | Description |
+|--------|-------------|
+| `pending` | Invited but hasn't completed registration |
+| `active` | Approved and active member |
+| `inactive` | Temporarily deactivated |
+
+---
+
+## Error Codes
+
+| Code | Description |
+|------|-------------|
+| 400 | Bad Request - Missing or invalid parameters |
+| 401 | Unauthorized - Invalid or missing token |
+| 403 | Forbidden - Insufficient permissions or unauthorized profile access |
+| 404 | Not Found - Member doesn't exist |
+| 500 | Internal Server Error |
+
+---
+
+## Related APIs
+
+<CardGroup cols={2}>
+  <Card title="Teams" icon="users" href="/api/teams">
+    Manage team memberships
+  </Card>
+  <Card title="Areas" icon="folder" href="/api/areas">
+    Manage area assignments
+  </Card>
+</CardGroup>

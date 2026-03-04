@@ -1,0 +1,517 @@
+---
+title: 'Calendar API'
+description: 'Manage meetings, events, and team member assignments'
+---
+
+## Overview
+
+The Calendar API manages church meetings, events, and services. It includes functionality for creating events, viewing schedules, assigning team members, and managing playlists for worship services.
+
+## Authentication
+
+All endpoints require authentication with specific permissions:
+
+- **Read**: `calendar.read`
+- **Create**: `meeting.create`
+- **Update/Assign**: `meeting.update`
+
+```bash
+Authorization: Bearer YOUR_JWT_TOKEN
+```
+
+---
+
+## List Events
+
+<Card title="GET /api/calendar/events" icon="calendar">
+  Retrieve all meetings and events for a church
+</Card>
+
+**Required Permission:** `calendar.read`
+
+### Query Parameters
+
+<ParamField query="church_id" type="integer">
+  Filter events by church ID. Defaults to authenticated user's church.
+</ParamField>
+
+<ParamField query="churchId" type="integer">
+  Alternative parameter for church_id
+</ParamField>
+
+<ParamField query="start" type="string">
+  Filter events starting from this date (ISO 8601 format: YYYY-MM-DD)
+</ParamField>
+
+<ParamField query="end" type="string">
+  Filter events ending before this date (ISO 8601 format: YYYY-MM-DD)
+</ParamField>
+
+### Request
+
+```bash
+# All events for a church
+curl -X GET "https://your-domain.com/api/calendar/events?church_id=1" \
+  -H "Authorization: Bearer YOUR_TOKEN"
+
+# Events in a date range
+curl -X GET "https://your-domain.com/api/calendar/events?church_id=1&start=2024-03-01&end=2024-03-31" \
+  -H "Authorization: Bearer YOUR_TOKEN"
+```
+
+### Response
+
+<ResponseField name="success" type="boolean">
+  Indicates if the request was successful
+</ResponseField>
+
+<ResponseField name="instances" type="array">
+  Array of meeting/event objects
+</ResponseField>
+
+```json
+{
+  "success": true,
+  "instances": [
+    {
+      "id": 15,
+      "calendar_id": 1,
+      "title": "Sunday Morning Service",
+      "description": "Regular Sunday worship service",
+      "start_at": "2024-03-17 10:00:00",
+      "end_at": "2024-03-17 12:00:00",
+      "location": "Main Sanctuary",
+      "created_by_member_id": 5,
+      "created_at": "2024-03-01 14:30:00"
+    },
+    {
+      "id": 18,
+      "calendar_id": 1,
+      "title": "Worship Team Rehearsal",
+      "description": "Prepare for Sunday service",
+      "start_at": "2024-03-15 19:00:00",
+      "end_at": "2024-03-15 21:00:00",
+      "location": "Fellowship Hall",
+      "created_by_member_id": 5,
+      "created_at": "2024-03-10 09:15:00"
+    }
+  ]
+}
+```
+
+---
+
+## Get Event Details
+
+<Card title="GET /api/calendar/{id}" icon="calendar-day">
+  Retrieve detailed information about a specific event
+</Card>
+
+**Required Permission:** `calendar.read`
+
+### Request Parameters
+
+<ParamField path="id" type="integer" required>
+  The unique identifier of the meeting/event
+</ParamField>
+
+### Request
+
+```bash
+curl -X GET https://your-domain.com/api/calendar/15 \
+  -H "Authorization: Bearer YOUR_TOKEN"
+```
+
+### Response
+
+```json
+{
+  "success": true,
+  "details": {
+    "id": 15,
+    "calendar_id": 1,
+    "church_id": 1,
+    "title": "Sunday Morning Service",
+    "description": "Regular Sunday worship service",
+    "start_at": "2024-03-17 10:00:00",
+    "end_at": "2024-03-17 12:00:00",
+    "location": "Main Sanctuary",
+    "created_by_member_id": 5,
+    "created_by_name": "John Smith",
+    "playlist_id": 3,
+    "assignments": [
+      {
+        "member_id": 5,
+        "member_name": "John Smith",
+        "role": "Worship Leader",
+        "instrument_id": 5,
+        "instrument_name": "Acoustic Guitar"
+      },
+      {
+        "member_id": 12,
+        "member_name": "Emily Davis",
+        "role": "Vocals",
+        "instrument_id": null,
+        "instrument_name": null
+      }
+    ]
+  }
+}
+```
+
+### Error Response
+
+**Not Found (404)**
+```json
+{
+  "success": false,
+  "error": "Event not found"
+}
+```
+
+---
+
+## Create Event
+
+<Card title="POST /api/calendar" icon="plus">
+  Create a new meeting or event
+</Card>
+
+**Required Permission:** `meeting.create`
+
+### Request Body
+
+<ParamField body="title" type="string" required>
+  The title of the event
+</ParamField>
+
+<ParamField body="church_id" type="integer">
+  The church ID (uses authenticated user's church if omitted)
+</ParamField>
+
+<ParamField body="churchId" type="integer">
+  Alternative parameter for church_id
+</ParamField>
+
+<ParamField body="description" type="string">
+  Description of the event
+</ParamField>
+
+<ParamField body="start_at" type="string">
+  Start date/time (ISO 8601: YYYY-MM-DD HH:MM:SS)
+</ParamField>
+
+<ParamField body="date" type="string">
+  Alternative parameter for start_at
+</ParamField>
+
+<ParamField body="end_at" type="string">
+  End date/time (ISO 8601: YYYY-MM-DD HH:MM:SS)
+</ParamField>
+
+<ParamField body="location" type="string">
+  Physical location of the event
+</ParamField>
+
+### Request
+
+```bash
+curl -X POST https://your-domain.com/api/calendar \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "title": "Easter Sunday Service",
+    "description": "Special Easter celebration service",
+    "start_at": "2024-03-31 10:00:00",
+    "end_at": "2024-03-31 12:30:00",
+    "location": "Main Sanctuary",
+    "church_id": 1
+  }'
+```
+
+### Response
+
+```json
+{
+  "success": true,
+  "id": 22
+}
+```
+
+### Process Details
+
+1. Ensures a default calendar exists for the church
+2. Creates the meeting record
+3. Logs activity in the system
+4. Returns the new meeting ID
+
+### Error Response
+
+**Missing Church Context (400)**
+```json
+{
+  "success": false,
+  "error": "Church ID required for meeting creation"
+}
+```
+
+---
+
+## Get Assignment Data
+
+<Card title="GET /api/calendar/assignment-data" icon="clipboard-list">
+  Retrieve data needed for creating assignments (members, instruments, playlists)
+</Card>
+
+**Required Permission:** `calendar.read`
+
+### Request
+
+```bash
+curl -X GET https://your-domain.com/api/calendar/assignment-data \
+  -H "Authorization: Bearer YOUR_TOKEN"
+```
+
+### Response
+
+```json
+{
+  "success": true,
+  "members": [
+    {
+      "id": 5,
+      "name": "John Smith",
+      "email": "john@example.com",
+      "role_id": 2
+    },
+    {
+      "id": 12,
+      "name": "Emily Davis",
+      "email": "emily@example.com",
+      "role_id": 5
+    }
+  ],
+  "instruments": [
+    {
+      "id": 1,
+      "name": "Acoustic Guitar"
+    },
+    {
+      "id": 2,
+      "name": "Electric Guitar"
+    },
+    {
+      "id": 3,
+      "name": "Piano/Keys"
+    },
+    {
+      "id": 4,
+      "name": "Drums"
+    },
+    {
+      "id": 5,
+      "name": "Bass"
+    }
+  ],
+  "playlists": [
+    {
+      "id": 3,
+      "name": "Sunday Service - March 17",
+      "song_count": 6
+    },
+    {
+      "id": 5,
+      "name": "Easter Sunday Set",
+      "song_count": 8
+    }
+  ]
+}
+```
+
+---
+
+## Assign Member to Event
+
+<Card title="POST /api/calendar/assignment" icon="user-plus">
+  Assign a team member to a meeting with a specific role and instrument
+</Card>
+
+**Required Permission:** `meeting.update`
+
+### Request Body
+
+<ParamField body="meetingId" type="integer" required>
+  The ID of the meeting to assign to
+</ParamField>
+
+<ParamField body="instanceId" type="integer">
+  Alternative parameter for meetingId
+</ParamField>
+
+<ParamField body="memberId" type="integer" required>
+  The ID of the member to assign
+</ParamField>
+
+<ParamField body="role" type="string">
+  The role for this assignment (e.g., "Worship Leader", "Vocals", "Tech")
+</ParamField>
+
+<ParamField body="instrumentId" type="integer">
+  The instrument ID if applicable
+</ParamField>
+
+### Request
+
+```bash
+curl -X POST https://your-domain.com/api/calendar/assignment \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "meetingId": 15,
+    "memberId": 12,
+    "role": "Vocals",
+    "instrumentId": null
+  }'
+```
+
+### Response
+
+```json
+{
+  "success": true
+}
+```
+
+### Process Details
+
+1. Creates the assignment record
+2. Logs activity for tracking
+3. Creates a notification for the assigned member
+4. Notification includes meeting title and link
+
+### Error Response
+
+**Missing Required Fields (400)**
+```json
+{
+  "success": false,
+  "error": "Meeting ID and Member ID required"
+}
+```
+
+---
+
+## Notifications
+
+When a member is assigned to an event, they receive a notification:
+
+### Notification Object
+
+```json
+{
+  "member_id": 12,
+  "type": "assignment",
+  "title": "Nueva asignación",
+  "message": "Has sido asignado a la reunión: Sunday Morning Service",
+  "link": "/mainhub/calendar"
+}
+```
+
+---
+
+## Church Context Resolution
+
+The API resolves church context in the following order:
+
+1. **Request body** `church_id` or `churchId`
+2. **Query parameter** `church_id` or `churchId`
+3. **User's church** from authenticated member data
+4. **Super admin fallback** uses first available church
+
+---
+
+## Date Filtering
+
+When using date filters:
+
+- Use ISO 8601 format: `YYYY-MM-DD`
+- `start` parameter: Events starting on or after this date
+- `end` parameter: Events starting before this date
+- Both parameters are optional
+- Omitting both returns all future events
+
+**Example:** Get March 2024 events
+```
+start=2024-03-01&end=2024-04-01
+```
+
+---
+
+## Activity Logging
+
+### Event Creation
+
+```json
+{
+  "church_id": 1,
+  "member_id": 5,
+  "action": "created",
+  "entity_type": "meeting",
+  "entity_id": 22,
+  "details": {"name": "Easter Sunday Service"}
+}
+```
+
+### Member Assignment
+
+```json
+{
+  "church_id": 1,
+  "member_id": 5,
+  "action": "assigned",
+  "entity_type": "meeting",
+  "entity_id": 15,
+  "details": {
+    "target_name": "Emily Davis",
+    "meeting_title": "Sunday Morning Service"
+  }
+}
+```
+
+---
+
+## Error Codes
+
+| Code | Description |
+|------|-------------|
+| 400 | Bad Request - Missing required fields or invalid church context |
+| 401 | Unauthorized - Invalid or missing token |
+| 403 | Forbidden - Insufficient permissions |
+| 404 | Not Found - Event doesn't exist |
+| 500 | Internal Server Error |
+
+---
+
+## Common Assignment Roles
+
+- `Worship Leader` - Leads the worship team
+- `Vocals` - Singer
+- `Tech` - Audio/video operator
+- `Member` - General team member
+- `Coordinator` - Service coordinator
+
+---
+
+## Related APIs
+
+<CardGroup cols={2}>
+  <Card title="Playlists" icon="list-music" href="/api/playlists">
+    Manage song playlists for services
+  </Card>
+  <Card title="Teams" icon="users" href="/api/teams">
+    Manage worship teams
+  </Card>
+  <Card title="People" icon="user-group" href="/api/people">
+    Manage church members
+  </Card>
+</CardGroup>

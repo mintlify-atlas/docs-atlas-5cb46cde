@@ -1,0 +1,345 @@
+---
+title: 'Areas API'
+description: 'Manage ministry areas within churches'
+---
+
+## Overview
+
+Areas represent organizational units within a church (e.g., Worship, Youth, Children's Ministry). Each area belongs to a specific church and can contain multiple teams.
+
+## Authentication
+
+All endpoints require authentication and the `church.read` or `church.update` permission depending on the operation.
+
+```bash
+Authorization: Bearer YOUR_JWT_TOKEN
+```
+
+---
+
+## List Areas
+
+<Card title="GET /api/areas" icon="list">
+  Retrieve all areas for a church
+</Card>
+
+**Required Permission:** `church.read`
+
+### Query Parameters
+
+<ParamField query="church_id" type="integer">
+  Filter areas by church ID. If omitted, uses the authenticated user's church (non-super admins)
+</ParamField>
+
+<ParamField query="churchId" type="integer">
+  Alternative parameter name for church_id
+</ParamField>
+
+### Request
+
+```bash
+curl -X GET "https://your-domain.com/api/areas?church_id=1" \
+  -H "Authorization: Bearer YOUR_TOKEN"
+```
+
+### Response
+
+<ResponseField name="success" type="boolean">
+  Indicates if the request was successful
+</ResponseField>
+
+<ResponseField name="areas" type="array">
+  Array of area objects
+</ResponseField>
+
+```json
+{
+  "success": true,
+  "areas": [
+    {
+      "id": 1,
+      "church_id": 1,
+      "name": "Worship Ministry",
+      "description": "Music and worship team coordination",
+      "created_at": "2024-01-15 10:30:00"
+    },
+    {
+      "id": 2,
+      "church_id": 1,
+      "name": "Youth Ministry",
+      "description": "Programs for teenagers and young adults",
+      "created_at": "2024-01-20 14:15:00"
+    }
+  ]
+}
+```
+
+**Super Admin Response:**
+
+When a super admin queries without a church_id, results include church names:
+
+```json
+{
+  "success": true,
+  "areas": [
+    {
+      "id": 1,
+      "church_id": 1,
+      "church_name": "First Baptist Church",
+      "name": "Worship Ministry",
+      "description": "Music and worship team coordination"
+    }
+  ]
+}
+```
+
+---
+
+## Create Area
+
+<Card title="POST /api/areas" icon="plus">
+  Create a new area within a church
+</Card>
+
+**Required Permission:** `church.update`
+
+### Request Body
+
+<ParamField body="name" type="string" required>
+  The name of the area
+</ParamField>
+
+<ParamField body="church_id" type="integer" required>
+  The ID of the church this area belongs to
+</ParamField>
+
+<ParamField body="churchId" type="integer">
+  Alternative parameter name for church_id
+</ParamField>
+
+<ParamField body="description" type="string">
+  Optional description of the area's purpose
+</ParamField>
+
+### Request
+
+```bash
+curl -X POST https://your-domain.com/api/areas \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Children Ministry",
+    "church_id": 1,
+    "description": "Programs for kids ages 0-12"
+  }'
+```
+
+### Alternative with Query Parameter
+
+```bash
+curl -X POST "https://your-domain.com/api/areas?church_id=1" \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Children Ministry"
+  }'
+```
+
+### Response
+
+```json
+{
+  "success": true,
+  "message": "Area created"
+}
+```
+
+### Error Responses
+
+**Missing Required Fields (400)**
+```json
+{
+  "success": false,
+  "error": "Name and Church ID required"
+}
+```
+
+---
+
+## Update Area
+
+<Card title="PUT /api/areas/{id}" icon="pen">
+  Update an existing area
+</Card>
+
+**Required Permission:** `church.update`
+
+### Request Parameters
+
+<ParamField path="id" type="integer" required>
+  The ID of the area to update
+</ParamField>
+
+<ParamField body="name" type="string" required>
+  The updated name of the area
+</ParamField>
+
+<ParamField body="description" type="string">
+  Updated description (optional)
+</ParamField>
+
+### Request
+
+```bash
+curl -X PUT https://your-domain.com/api/areas/1 \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Worship & Creative Arts",
+    "description": "Music, media, and creative ministries"
+  }'
+```
+
+### Response
+
+```json
+{
+  "success": true,
+  "message": "Area updated"
+}
+```
+
+### Error Responses
+
+**Invalid ID (400)**
+```json
+{
+  "success": false,
+  "error": "Invalid ID"
+}
+```
+
+**Missing Name (400)**
+```json
+{
+  "success": false,
+  "error": "Name is required"
+}
+```
+
+---
+
+## Delete Area
+
+<Card title="DELETE /api/areas/{id}" icon="trash">
+  Delete an area
+</Card>
+
+**Required Permission:** `church.update`
+
+<Warning>
+  Deleting an area may affect associated teams. Ensure teams are reassigned or deleted first.
+</Warning>
+
+### Request Parameters
+
+<ParamField path="id" type="integer" required>
+  The ID of the area to delete
+</ParamField>
+
+### Request
+
+```bash
+curl -X DELETE https://your-domain.com/api/areas/1 \
+  -H "Authorization: Bearer YOUR_TOKEN"
+```
+
+### Response
+
+```json
+{
+  "success": true,
+  "message": "Area deleted"
+}
+```
+
+### Error Responses
+
+**Invalid ID (400)**
+```json
+{
+  "success": false,
+  "error": "Invalid ID"
+}
+```
+
+**Deletion Failed (200)**
+```json
+{
+  "success": false,
+  "message": "Error deleting area"
+}
+```
+
+---
+
+## Permission Context
+
+### Church ID Resolution
+
+The API automatically resolves the church context based on:
+
+1. **Query parameter**: `church_id` or `churchId`
+2. **Request body**: For POST/PUT requests
+3. **User context**: For non-super admins, uses their assigned church
+4. **Super admin**: Can access all churches or specify a church_id
+
+### Permission Checks
+
+- **Read operations**: Require `church.read` permission for the specified church
+- **Write operations**: Require `church.update` permission for the specified church
+- **Super admins**: Can perform operations across all churches
+
+---
+
+## Activity Logging
+
+Area creation automatically logs an activity entry:
+
+```json
+{
+  "church_id": 1,
+  "member_id": 5,
+  "action": "created",
+  "entity_type": "area",
+  "entity_id": 3,
+  "details": {
+    "name": "Children Ministry"
+  }
+}
+```
+
+---
+
+## Error Codes
+
+| Code | Description |
+|------|-------------|
+| 400 | Bad Request - Invalid or missing parameters |
+| 401 | Unauthorized - Invalid or missing token |
+| 403 | Forbidden - Insufficient permissions for the church |
+| 404 | Not Found - Area doesn't exist |
+| 500 | Internal Server Error |
+
+---
+
+## Related APIs
+
+<CardGroup cols={2}>
+  <Card title="Churches" icon="building-columns" href="/api/churches">
+    Manage church organizations
+  </Card>
+  <Card title="Teams" icon="users" href="/api/teams">
+    Manage teams within areas
+  </Card>
+</CardGroup>

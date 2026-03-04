@@ -1,0 +1,137 @@
+---
+title: Multi-Tenancy
+description: Manage multiple churches and congregations from a single account with seamless context switching
+icon: church
+---
+
+MinistryHub's multi-tenancy architecture allows you to oversee and manage multiple churches, congregations, or multi-site organizations from a unified platform. Whether you're leading a single local church or managing a global network of ministries, the platform adapts to your organizational structure.
+
+## Church Switching
+
+Users with access to multiple churches can seamlessly switch between different congregations without logging out. The entire interface updates to reflect the selected church's context, including:
+
+- Member directories and teams
+- Song libraries and setlists
+- Calendar events and meetings
+- Reports and attendance data
+
+When you switch churches, the system automatically filters all data to show only information relevant to the selected congregation.
+
+<Info>
+The church selector appears in the header when you have access to multiple organizations. Simply click to view and switch between your available churches.
+</Info>
+
+## Role-Based Access Control
+
+Each church maintains its own independent permission structure. Your role and permissions are church-specific, meaning you might be an administrator in one congregation and a regular member in another.
+
+### Available Roles
+
+<CardGroup cols={2}>
+  <Card title="Admin" icon="shield-halved">
+    Full control over church settings, member management, and all modules. Can invite new users, approve member requests, and configure areas and teams.
+  </Card>
+  
+  <Card title="Leader" icon="users">
+    Manages specific teams or areas within the church. Can coordinate team members, create events, and manage content within their assigned domain.
+  </Card>
+  
+  <Card title="Member" icon="user">
+    Standard access to view information, participate in teams, and contribute content. Can propose song edits and view assigned events.
+  </Card>
+  
+  <Card title="Master" icon="crown">
+    Global superadmin role with unrestricted access to all churches in the system. Used for platform oversight, maintenance, and support.
+  </Card>
+</CardGroup>
+
+## Master User Capabilities
+
+Master users have elevated privileges across the entire platform:
+
+- **Global Access**: View and manage any church without restrictions
+- **Cross-Church Operations**: Access the complete song library across all organizations
+- **System Oversight**: Perform audits, view activity logs, and manage global settings
+- **Multi-Church Support**: Assist any congregation with setup or troubleshooting
+
+<Warning>
+Master users bypass normal permission checks. This role should be reserved for platform administrators and trusted support personnel only.
+</Warning>
+
+## Church Setup Wizard
+
+When creating a new church, administrators are guided through a sequential setup process that ensures proper configuration:
+
+### Step 1: Basic Information
+Enter your church name, location, and primary contact details. This information appears in email communications and system branding.
+
+### Step 2: Create Areas
+Organize your church into functional areas such as:
+- Worship & Music
+- Technical Production
+- Ushers & Welcome Team
+- Children's Ministry
+- Administrative Staff
+
+By default, two areas are automatically created: **Ushers** and **Worship**, giving you a foundation to build upon.
+
+### Step 3: Build Teams
+Within each area, create specific teams to organize volunteers and staff. For example, the Worship area might include teams for:
+- Singers
+- Musicians
+- Sound Engineers
+- Worship Leaders
+
+### Step 4: Invite Leaders
+Assign team leaders who will coordinate activities, manage members, and oversee their respective domains. Leaders receive invitation emails with secure setup links.
+
+<Tip>
+Take time during setup to think through your organizational structure. Well-defined areas and teams make member management and reporting much more effective.
+</Tip>
+
+## Contextual Branding
+
+The platform automatically adapts its branding and navigation based on your current context:
+
+- **Ministry Hub**: When working with worship and music features
+- **Diaconos Hub**: When managing ushers and service logistics
+- **Tech Hub**: When coordinating multimedia and production
+- **Church Center**: For general administration and oversight
+- **Pastoral Hub**: Executive dashboard for senior leadership
+
+This contextual approach ensures you always see the most relevant tools for your current task, reducing clutter and improving focus.
+
+## Data Isolation
+
+Each church's data is completely isolated from other organizations:
+
+- **Member Privacy**: User information is only visible within the appropriate church context
+- **Content Separation**: Songs, setlists, and events are church-specific (except for Master users)
+- **Independent Settings**: Each church maintains its own preferences, themes, and configurations
+- **Secure Invitations**: Member invitations are scoped to the specific church
+
+## Multi-Site Churches
+
+For multi-site churches, you have flexibility in how to structure your organization:
+
+**Option 1: Single Church with Multiple Teams**  
+Manage all sites under one church entity, using areas and teams to represent different locations. This approach provides unified reporting and shared resources.
+
+**Option 2: Separate Churches per Site**  
+Create independent church entries for each campus. This gives complete autonomy to site leaders while maintaining top-level oversight through Master user access.
+
+Choose the structure that best matches your governance model and reporting needs.
+
+## Switching Context
+
+To switch between churches:
+
+1. Click the church name in the top header
+2. Select your desired congregation from the dropdown
+3. The interface immediately updates with the new church's data
+
+All your open tabs and windows remain functional, simply showing information for the newly selected context.
+
+<Note>
+If you're working with data specific to one church (like editing a song), you'll be prompted to save or discard changes before switching contexts.
+</Note>

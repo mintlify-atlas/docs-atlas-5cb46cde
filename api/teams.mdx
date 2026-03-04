@@ -1,0 +1,506 @@
+---
+title: 'Teams API'
+description: 'Manage teams and team member assignments'
+---
+
+## Overview
+
+Teams (also called groups) represent ministry groups within a church. Each team belongs to a church and optionally to an area. Teams have members with specific roles (leader, member, etc.).
+
+## Authentication
+
+All endpoints require authentication. Permissions vary by operation:
+
+- **Read**: `team.read`
+- **Create**: `team.create`
+- **Update**: `team.update`
+
+```bash
+Authorization: Bearer YOUR_JWT_TOKEN
+```
+
+---
+
+## List Teams
+
+<Card title="GET /api/teams" icon="list">
+  Retrieve all teams for a church
+</Card>
+
+**Required Permission:** `team.read`
+
+### Query Parameters
+
+<ParamField query="church_id" type="integer">
+  Filter teams by church ID
+</ParamField>
+
+<ParamField query="churchId" type="integer">
+  Alternative parameter for church_id
+</ParamField>
+
+<ParamField query="area_id" type="integer">
+  Filter teams by area ID
+</ParamField>
+
+<ParamField query="areaId" type="integer">
+  Alternative parameter for area_id
+</ParamField>
+
+### Request
+
+```bash
+# All teams in a church
+curl -X GET "https://your-domain.com/api/teams?church_id=1" \
+  -H "Authorization: Bearer YOUR_TOKEN"
+
+# Teams in a specific area
+curl -X GET "https://your-domain.com/api/teams?church_id=1&area_id=2" \
+  -H "Authorization: Bearer YOUR_TOKEN"
+```
+
+### Response
+
+<ResponseField name="success" type="boolean">
+  Indicates if the request was successful
+</ResponseField>
+
+<ResponseField name="groups" type="array">
+  Array of team objects (note: the response uses "groups" as the key)
+</ResponseField>
+
+```json
+{
+  "success": true,
+  "groups": [
+    {
+      "id": 1,
+      "church_id": 1,
+      "area_id": 2,
+      "name": "Worship Band",
+      "description": "Sunday morning worship team",
+      "leader_id": 5,
+      "leader_name": "John Smith",
+      "created_at": "2024-01-15 10:30:00"
+    },
+    {
+      "id": 2,
+      "church_id": 1,
+      "area_id": 2,
+      "name": "Tech Team",
+      "description": "Audio and video production",
+      "leader_id": 8,
+      "leader_name": "Sarah Johnson",
+      "created_at": "2024-02-01 14:20:00"
+    }
+  ]
+}
+```
+
+---
+
+## List Team Members
+
+<Card title="GET /api/teams/{id}/members" icon="users">
+  Retrieve all members of a specific team
+</Card>
+
+**Required Permission:** `team.read`
+
+### Request Parameters
+
+<ParamField path="id" type="integer" required>
+  The ID of the team
+</ParamField>
+
+### Request
+
+```bash
+curl -X GET https://your-domain.com/api/teams/1/members \
+  -H "Authorization: Bearer YOUR_TOKEN"
+```
+
+### Response
+
+<ResponseField name="success" type="boolean">
+  Indicates if the request was successful
+</ResponseField>
+
+<ResponseField name="users" type="array">
+  Array of team member objects
+</ResponseField>
+
+```json
+{
+  "success": true,
+  "users": [
+    {
+      "id": 5,
+      "name": "John Smith",
+      "email": "john@example.com",
+      "role_in_group": "leader",
+      "joined_at": "2024-01-15 10:30:00"
+    },
+    {
+      "id": 12,
+      "name": "Emily Davis",
+      "email": "emily@example.com",
+      "role_in_group": "member",
+      "joined_at": "2024-02-10 09:15:00"
+    }
+  ]
+}
+```
+
+---
+
+## Create Team
+
+<Card title="POST /api/teams" icon="plus">
+  Create a new team within a church
+</Card>
+
+**Required Permission:** `team.create`
+
+### Request Body
+
+<ParamField body="name" type="string" required>
+  The name of the team
+</ParamField>
+
+<ParamField body="church_id" type="integer" required>
+  The ID of the church this team belongs to
+</ParamField>
+
+<ParamField body="churchId" type="integer">
+  Alternative parameter for church_id
+</ParamField>
+
+<ParamField body="area_id" type="integer">
+  The ID of the area this team belongs to (optional)
+</ParamField>
+
+<ParamField body="areaId" type="integer">
+  Alternative parameter for area_id
+</ParamField>
+
+<ParamField body="description" type="string">
+  Description of the team's purpose
+</ParamField>
+
+<ParamField body="leaderId" type="integer">
+  Member ID to assign as team leader
+</ParamField>
+
+### Request
+
+```bash
+curl -X POST https://your-domain.com/api/teams \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Worship Band",
+    "church_id": 1,
+    "area_id": 2,
+    "description": "Sunday morning worship team",
+    "leaderId": 5
+  }'
+```
+
+### Response
+
+```json
+{
+  "success": true,
+  "message": "Team created",
+  "id": 3
+}
+```
+
+### Error Responses
+
+**Missing Required Fields (400)**
+```json
+{
+  "success": false,
+  "error": "Name and Church ID required"
+}
+```
+
+**Creation Failed**
+```json
+{
+  "success": false,
+  "message": "Failed to create team"
+}
+```
+
+---
+
+## Update Team
+
+<Card title="PUT /api/teams/{id}" icon="pen">
+  Update team details and/or leader
+</Card>
+
+**Required Permission:** `team.update`
+
+### Request Parameters
+
+<ParamField path="id" type="integer" required>
+  The ID of the team to update
+</ParamField>
+
+<ParamField body="name" type="string">
+  Updated team name
+</ParamField>
+
+<ParamField body="description" type="string">
+  Updated description
+</ParamField>
+
+<ParamField body="area_id" type="integer">
+  Updated area ID
+</ParamField>
+
+<ParamField body="leaderId" type="integer">
+  New leader member ID
+</ParamField>
+
+### Request
+
+```bash
+curl -X PUT https://your-domain.com/api/teams/1 \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Worship & Creative Arts Team",
+    "description": "Expanded worship and media team",
+    "leaderId": 8
+  }'
+```
+
+### Response
+
+```json
+{
+  "success": true,
+  "message": "Team updated"
+}
+```
+
+---
+
+## Assign Member to Team
+
+<Card title="POST /api/teams/{id}/members" icon="user-plus">
+  Add a member to a team with a specific role
+</Card>
+
+**Required Permission:** `team.create`
+
+### Request Parameters
+
+<ParamField path="id" type="integer" required>
+  The ID of the team
+</ParamField>
+
+<ParamField body="memberId" type="integer" required>
+  The ID of the member to assign
+</ParamField>
+
+<ParamField body="roleInGroup" type="string">
+  The role for this member (default: "member")
+</ParamField>
+
+### Request
+
+```bash
+curl -X POST https://your-domain.com/api/teams/1/members \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "memberId": 12,
+    "roleInGroup": "member"
+  }'
+```
+
+### Response
+
+```json
+{
+  "success": true
+}
+```
+
+### Error Responses
+
+**Missing Member ID (400)**
+```json
+{
+  "success": false,
+  "error": "Member ID required"
+}
+```
+
+---
+
+## Bulk Assign Members
+
+<Card title="POST /api/teams/{id}/members/bulk" icon="user-group">
+  Assign multiple members to a team at once
+</Card>
+
+**Required Permission:** `team.create`
+
+### Request Parameters
+
+<ParamField path="id" type="integer" required>
+  The ID of the team
+</ParamField>
+
+<ParamField body="memberIds" type="array" required>
+  Array of member IDs to assign
+</ParamField>
+
+### Request
+
+```bash
+curl -X POST https://your-domain.com/api/teams/1/members/bulk \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "memberIds": [12, 15, 18, 22]
+  }'
+```
+
+### Response
+
+```json
+{
+  "success": true
+}
+```
+
+---
+
+## Join Team (Self-Service)
+
+<Card title="POST /api/teams/{id}/join" icon="arrow-right-to-bracket">
+  Allow authenticated user to join a team
+</Card>
+
+**Required Permission:** `team.create`
+
+### Request Parameters
+
+<ParamField path="id" type="integer" required>
+  The ID of the team to join
+</ParamField>
+
+### Request
+
+```bash
+curl -X POST https://your-domain.com/api/teams/1/join \
+  -H "Authorization: Bearer YOUR_TOKEN"
+```
+
+### Response
+
+```json
+{
+  "success": true
+}
+```
+
+---
+
+## Delete Team
+
+<Card title="DELETE /api/teams/{id}" icon="trash">
+  Delete a team
+</Card>
+
+**Required Permission:** `team.update`
+
+<Warning>
+  Deleting a team will remove all member assignments. This action may be irreversible depending on your database configuration.
+</Warning>
+
+### Request Parameters
+
+<ParamField path="id" type="integer" required>
+  The ID of the team to delete
+</ParamField>
+
+### Request
+
+```bash
+curl -X DELETE https://your-domain.com/api/teams/1 \
+  -H "Authorization: Bearer YOUR_TOKEN"
+```
+
+### Response
+
+```json
+{
+  "success": true
+}
+```
+
+---
+
+## Church Context Resolution
+
+The API resolves the church context in the following order:
+
+1. **Query parameter**: `church_id` or `churchId`
+2. **Request body**: For POST/PUT requests
+3. **User's church**: For non-super admins without explicit church_id
+4. **Required**: Returns 400 error if church context cannot be determined
+
+---
+
+## Activity Logging
+
+Team operations automatically log activities:
+
+**Team Creation:**
+```json
+{
+  "church_id": 1,
+  "member_id": 5,
+  "action": "created",
+  "entity_type": "team",
+  "entity_id": 3,
+  "details": {"name": "Worship Band"}
+}
+```
+
+---
+
+## Error Codes
+
+| Code | Description |
+|------|-------------|
+| 400 | Bad Request - Missing church_id, invalid parameters |
+| 401 | Unauthorized - Invalid or missing token |
+| 403 | Forbidden - Insufficient permissions |
+| 404 | Not Found - Team doesn't exist |
+| 500 | Internal Server Error |
+
+---
+
+## Related APIs
+
+<CardGroup cols={2}>
+  <Card title="Areas" icon="folder" href="/api/areas">
+    Manage areas that contain teams
+  </Card>
+  <Card title="People" icon="user-group" href="/api/people">
+    Manage church members
+  </Card>
+  <Card title="Calendar" icon="calendar" href="/api/calendar">
+    Schedule team meetings and events
+  </Card>
+</CardGroup>

@@ -1,0 +1,498 @@
+---
+title: Production Deployment
+description: Deploy MinistryHub to a production server
+---
+
+## Overview
+
+Deploying MinistryHub to production requires building the frontend, configuring the server, and ensuring proper security measures are in place.
+
+## Prerequisites
+
+- Web server (Apache or Nginx) with PHP 8.0+
+- MySQL 8.0+ database
+- SSL/TLS certificate (recommended)
+- Domain name configured
+- SSH access to your server
+
+## Build Process
+
+### 1. Build Frontend Assets
+
+Navigate to the frontend directory and create a production build:
+
+<CodeGroup>
+```bash npm
+cd frontend
+npm run build
+```
+
+```bash yarn
+cd frontend
+yarn build
+```
+
+```bash pnpm
+cd frontend
+pnpm build
+```
+</CodeGroup>
+
+The build command runs TypeScript compilation followed by Vite's production build:
+
+```json package.json
+{
+  "scripts": {
+    "build": "tsc -b && vite build"
+  }
+}
+```
+
+### 2. Verify Build Output
+
+Vite is configured to output directly to `public_html`:
+
+```ts frontend/vite.config.ts
+export default defineConfig({
+  plugins: [react()],
+  build: {
+    outDir: resolve(__dirname, '../public_html'),
+    emptyOutDir: false,
+    rollupOptions: {
+      input: resolve(__dirname, 'index.html')
+    }
+  }
+})
+```
+
+After building, verify the output:
+
+```bash
+ls -la public_html/assets/
+```
+
+You should see optimized JavaScript and CSS files.
+
+## Server Setup
+
+### Directory Structure
+
+Upload files to your server following this structure:
+
+```text
+/var/www/your-domain/
+├── backend/                # ABOVE web root (secure)
+│   ├── config/
+│   │   └── database.env   # Credentials (never public)
+│   ├── src/
+│   │   ├── Controllers/
+│   │   ├── Repositories/
+│   │   ├── Helpers/
+│   │   ├── Middleware/
+│   │   ├── Database.php
+│   │   ├── Jwt.php
+│   │   └── bootstrap.php
+│   └── logs/              # Writable by web server
+└── public_html/           # Web root (public)
+    ├── assets/            # Built from frontend
+    ├── api/
+    │   └── index.php      # API entry point
+    ├── .htaccess          # Routing configuration
+    └── index.html         # React SPA
+```
+
+<Warning>
+  **Critical**: The `backend` directory must be **outside** the web root (`public_html`) to prevent direct access to sensitive files like `database.env`.
+</Warning>
+
+### 1. Upload Files
+
+Using SCP or SFTP:
+
+```bash
+# Upload backend (above web root)
+scp -r backend user@your-server:/var/www/your-domain/
+
+# Upload public files
+scp -r public_html/* user@your-server:/var/www/your-domain/public_html/
+```
+
+Alternatively, use FTP or your hosting provider's file manager.
+
+### 2. Set File Permissions
+
+SSH into your server and set appropriate permissions:
+
+```bash
+cd /var/www/your-domain
+
+# Backend files (readable by web server)
+chmod -R 755 backend/src
+chmod 600 backend/config/database.env
+
+# Logs directory (writable by web server)
+mkdir -p backend/logs
+chown -R www-data:www-data backend/logs
+chmod 755 backend/logs
+
+# Public files
+chmod -R 755 public_html
+```
+
+<Note>
+  Replace `www-data` with your web server's user (e.g., `apache`, `nginx`, `nobody`).
+</Note>
+
+## Database Configuration
+
+### 1. Create Production Databases
+
+Connect to your MySQL server:
+
+```sql
+CREATE DATABASE ministryhub_main CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+CREATE DATABASE ministryhub_music CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+-- Create dedicated user
+CREATE USER 'ministryhub'@'localhost' IDENTIFIED BY 'strong_password_here';
+GRANT ALL PRIVILEGES ON ministryhub_main.* TO 'ministryhub'@'localhost';
+GRANT ALL PRIVILEGES ON ministryhub_music.* TO 'ministryhub'@'localhost';
+FLUSH PRIVILEGES;
+```
+
+### 2. Import Schema
+
+Import the SQL files:
+
+```bash
+mysql -u ministryhub -p ministryhub_main < "User SQL/main.sql"
+mysql -u ministryhub -p ministryhub_music < "Music SQL/music.sql"
+```
+
+### 3. Configure Environment
+
+Create `backend/config/database.env` with production credentials:
+
+```ini backend/config/database.env
+# Main Database
+DB_HOST=localhost
+DB_PORT=3306
+DB_USER=ministryhub
+DB_PASS=your_strong_database_password
+DB_NAME=ministryhub_main
+
+# Music Database
+MUSIC_DB_HOST=localhost
+MUSIC_DB_USER=ministryhub
+MUSIC_DB_PASS=your_strong_database_password
+MUSIC_DB_NAME=ministryhub_music
+
+# JWT Secret (Must be unique and secure)
+JWT_SECRET=generate_a_long_random_string_here_use_openssl_rand
+
+# reCAPTCHA
+RECAPTCHA_SECRET=your_recaptcha_v3_secret_key
+```
+
+<Tip>
+  Generate a secure JWT secret:
+  ```bash
+  openssl rand -base64 64
+  ```
+</Tip>
+
+## Web Server Configuration
+
+### Apache Configuration
+
+MinistryHub includes an `.htaccess` file for Apache:
+
+```apache public_html/.htaccess
+RewriteEngine On
+
+# API Routing
+RewriteRule ^api/?$ api/index.php [QSA,L]
+RewriteRule ^api/(.*)$ api/index.php [QSA,L]
+
+# Ensure Authorization header is visible to PHP
+RewriteCond %{HTTP:Authorization} ^(.*)
+RewriteRule .* - [e=HTTP_AUTHORIZATION:%1]
+
+# SPA Routing
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule . /index.html [L]
+```
+
+**Enable Required Modules**:
+
+```bash
+sudo a2enmod rewrite
+sudo a2enmod headers
+sudo systemctl restart apache2
+```
+
+**Virtual Host Configuration**:
+
+```apache
+<VirtualHost *:443>
+    ServerName your-domain.com
+    DocumentRoot /var/www/your-domain/public_html
+    
+    <Directory /var/www/your-domain/public_html>
+        Options -Indexes +FollowSymLinks
+        AllowOverride All
+        Require all granted
+    </Directory>
+    
+    # SSL Configuration
+    SSLEngine on
+    SSLCertificateFile /path/to/cert.pem
+    SSLCertificateKeyFile /path/to/key.pem
+    
+    # Security Headers
+    Header always set X-Content-Type-Options "nosniff"
+    Header always set X-Frame-Options "DENY"
+    Header always set X-XSS-Protection "1; mode=block"
+    Header always set Referrer-Policy "strict-origin-when-cross-origin"
+</VirtualHost>
+```
+
+### Nginx Configuration
+
+For Nginx users, create a server block:
+
+```nginx
+server {
+    listen 443 ssl http2;
+    server_name your-domain.com;
+    root /var/www/your-domain/public_html;
+    index index.html;
+    
+    # SSL Configuration
+    ssl_certificate /path/to/cert.pem;
+    ssl_certificate_key /path/to/key.pem;
+    
+    # API Routes
+    location ~ ^/api(/.*)?$ {
+        try_files $uri /api/index.php$is_args$args;
+    }
+    
+    # PHP Processing
+    location ~ \.php$ {
+        include snippets/fastcgi-php.conf;
+        fastcgi_pass unix:/var/run/php/php8.1-fpm.sock;
+        fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
+        
+        # Pass Authorization header
+        fastcgi_param HTTP_AUTHORIZATION $http_authorization;
+    }
+    
+    # SPA Routing
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+    
+    # Security Headers
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header X-Frame-Options "DENY" always;
+    add_header X-XSS-Protection "1; mode=block" always;
+    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+}
+```
+
+## Security Checklist
+
+<Steps>
+  <Step title="Secure database.env">
+    Ensure `backend/config/database.env` is:
+    - Outside the web root
+    - Has permissions `600`
+    - Not tracked in Git
+  </Step>
+  
+  <Step title="Generate Strong JWT Secret">
+    Use a cryptographically secure random string:
+    ```bash
+    openssl rand -base64 64
+    ```
+  </Step>
+  
+  <Step title="Enable HTTPS">
+    Install an SSL certificate (Let's Encrypt is free):
+    ```bash
+    sudo certbot --apache -d your-domain.com
+    ```
+  </Step>
+  
+  <Step title="Configure reCAPTCHA">
+    Set up Google reCAPTCHA v3 for login protection:
+    1. Register at https://www.google.com/recaptcha/admin
+    2. Add your domain
+    3. Add secret key to `database.env`
+  </Step>
+  
+  <Step title="Disable Error Display">
+    In production, ensure PHP doesn't display errors:
+    ```ini php.ini
+    display_errors = Off
+    log_errors = On
+    error_log = /var/log/php_errors.log
+    ```
+  </Step>
+  
+  <Step title="Set Up Monitoring">
+    Monitor `backend/logs/` for errors and security issues.
+  </Step>
+</Steps>
+
+## Post-Deployment
+
+### 1. Test API Endpoints
+
+Verify the API is working:
+
+```bash
+curl https://your-domain.com/api/health
+```
+
+### 2. Test Authentication
+
+Try logging in through the frontend and check:
+- JWT tokens are issued correctly
+- Authorization headers are passed
+- Protected routes require authentication
+
+### 3. Monitor Logs
+
+Check for errors:
+
+```bash
+tail -f /var/www/your-domain/backend/logs/*.log
+```
+
+### 4. Database Performance
+
+Optimize MySQL for production:
+
+```sql
+-- Add indexes for frequently queried columns
+CREATE INDEX idx_user_email ON user_accounts(email);
+CREATE INDEX idx_song_church ON songs(church_id);
+
+-- Analyze tables
+ANALYZE TABLE songs, user_accounts, meetings;
+```
+
+## Backup Strategy
+
+### Automated Database Backups
+
+Create a daily backup script:
+
+```bash
+#!/bin/bash
+BACKUP_DIR="/var/backups/ministryhub"
+DATE=$(date +%Y%m%d_%H%M%S)
+
+mkdir -p $BACKUP_DIR
+
+# Backup main database
+mysqldump -u ministryhub -p'password' ministryhub_main > $BACKUP_DIR/main_$DATE.sql
+
+# Backup music database
+mysqldump -u ministryhub -p'password' ministryhub_music > $BACKUP_DIR/music_$DATE.sql
+
+# Compress
+gzip $BACKUP_DIR/*_$DATE.sql
+
+# Delete backups older than 30 days
+find $BACKUP_DIR -name "*.gz" -mtime +30 -delete
+```
+
+Schedule with cron:
+
+```bash
+# Run daily at 2 AM
+0 2 * * * /usr/local/bin/backup-ministryhub.sh
+```
+
+### File Backups
+
+Backup configuration and logs:
+
+```bash
+tar -czf ministryhub-config-$(date +%Y%m%d).tar.gz \
+  /var/www/your-domain/backend/config/ \
+  /var/www/your-domain/backend/logs/
+```
+
+## Scaling Considerations
+
+### Database Optimization
+
+- Use connection pooling
+- Enable query caching
+- Add indexes on frequently queried columns
+- Consider read replicas for high traffic
+
+### CDN Integration
+
+Serve static assets through a CDN:
+
+1. Upload `public_html/assets/*` to CDN
+2. Update asset references in `index.html`
+
+### Caching
+
+Implement Redis/Memcached for:
+- JWT validation caching
+- Session management
+- API response caching
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="500 Internal Server Error">
+    Check PHP error logs and `backend/logs/`:
+    ```bash
+    tail -f /var/log/apache2/error.log
+    tail -f /var/www/your-domain/backend/logs/*.log
+    ```
+  </Accordion>
+
+  <Accordion title="API Returns 404">
+    Ensure mod_rewrite is enabled and `.htaccess` is being read:
+    ```bash
+    sudo a2enmod rewrite
+    # Check AllowOverride in Apache config
+    ```
+  </Accordion>
+
+  <Accordion title="Database Connection Failed">
+    Verify:
+    - MySQL service is running
+    - Credentials in `database.env` are correct
+    - User has proper grants
+    - Firewall allows connection
+  </Accordion>
+
+  <Accordion title="Authorization Header Not Found">
+    Check that the rewrite rule is present:
+    ```apache
+    RewriteCond %{HTTP:Authorization} ^(.*)
+    RewriteRule .* - [e=HTTP_AUTHORIZATION:%1]
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Configuration" icon="gear" href="/deployment/configuration">
+    Advanced configuration options
+  </Card>
+  <Card title="Monitoring" icon="chart-line" href="/api/reports">
+    Set up monitoring and alerts
+  </Card>
+</CardGroup>

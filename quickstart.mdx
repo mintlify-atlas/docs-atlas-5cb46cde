@@ -1,80 +1,272 @@
 ---
-title: "Quickstart"
-description: "Start building awesome documentation in minutes"
+title: Quickstart Guide
+description: Get your church up and running on MinistryHub in minutes with our guided setup wizard.
 ---
 
-## Get started in three steps
+## Initial Setup
 
-Get your documentation site running locally and make your first customization.
+MinistryHub features a guided setup wizard that walks you through the essential configuration steps. This ensures your church is properly structured before inviting team members.
 
-### Step 1: Set up your local environment
-
-<AccordionGroup>
-  <Accordion icon="copy" title="Clone your docs locally">
-    During the onboarding process, you created a GitHub repository with your docs content if you didn't already have one. You can find a link to this repository in your [dashboard](https://dashboard.mintlify.com).
+<Steps>
+  <Step title="Create Your Church Profile">
+    Set up your church's basic information including name, location, and contact details. This becomes the root organization for all your ministries.
     
-    To clone the repository locally so that you can make and preview changes to your docs, follow the [Cloning a repository](https://docs.github.com/en/repositories/creating-and-managing-repositories/cloning-a-repository) guide in the GitHub docs.
-  </Accordion>
-  <Accordion icon="rectangle-terminal" title="Start the preview server">
-    1. Install the Mintlify CLI: `npm i -g mint`
-    2. Navigate to your docs directory and run: `mint dev`
-    3. Open `http://localhost:3000` to see your docs live!
+    <Info>
+    If you're managing multiple campuses, create separate church profiles for each location.
+    </Info>
+  </Step>
+  
+  <Step title="Define Ministry Areas">
+    Create high-level ministry areas that organize your church structure:
     
-    <Tip>Your preview updates automatically as you edit files.</Tip>
-  </Accordion>
-</AccordionGroup>
-
-### Step 2: Deploy your changes
-
-<AccordionGroup>
-  <Accordion icon="github" title="Install our GitHub app">
-    Install the Mintlify GitHub app from your [dashboard](https://dashboard.mintlify.com/settings/organization/github-app).
+    - **Worship & Music**
+    - **Multimedia**
+    - **Children's Ministry**
+    - **Administration**
+    - **Ushers & Hospitality**
     
-    Our GitHub app automatically deploys your changes to your docs site, so you don't need to manage deployments yourself.
-</Accordion>
-<Accordion icon="palette" title="Update your site name and colors">
-    For a first change, let's update the name and colors of your docs site.
+    <Tip>
+    Think of areas as departments. They group related teams together for better organization.
+    </Tip>
+  </Step>
+  
+  <Step title="Create Teams Within Areas">
+    Under each area, create specific teams with clear responsibilities:
+    
+    **Example: Multimedia Area**
+    - Video Team
+    - Audio Team
+    - Lighting Team
+    - Streaming Team
+    
+    Each team can have its own leader and members.
+  </Step>
+  
+  <Step title="Invite Team Leaders">
+    Send email invitations to your ministry leaders. They'll receive a secure link to set their password and access the platform.
+    
+    <Warning>
+    Leaders must accept their invitation and create a password before they can access MinistryHub.
+    </Warning>
+  </Step>
+</Steps>
 
-    1. Open `docs.json` in your editor.
-    2. Change the `"name"` field to your project name.
-    3. Update the `"colors"` to match your brand.
-    4. Save and see your changes instantly at `http://localhost:3000`.
+## Accessing Your Hub
 
-    <Tip>Try changing the primary color to see an immediate difference!</Tip>
-  </Accordion>
-</AccordionGroup>
+After setup, you'll be directed to your personalized dashboard. MinistryHub automatically adapts based on your role and permissions.
 
-### Step 3: Go live
+### Hub Selection
 
-<Accordion icon="rocket" title="Publish your docs">
-  1. Commit and push your changes.
-  2. Your docs will update and be live in moments!
-</Accordion>
+Depending on your role, you'll see different hubs:
 
-## Next steps
-
-Now that you have your docs running, explore these key features:
-
-<CardGroup cols={2}>
-
-<Card title="Write Content" icon="pen-to-square" href="/essentials/markdown">
-  Learn MDX syntax and start writing your documentation.
-</Card>
-
-<Card title="Customize style" icon="palette" href="/essentials/settings">
-  Make your docs match your brand perfectly.
-</Card>
-
-<Card title="Add code examples" icon="square-code" href="/essentials/code">
-  Include syntax-highlighted code blocks.
-</Card>
-
-<Card title="API documentation" icon="code" href="/api-reference/introduction">
-  Auto-generate API docs from OpenAPI specs.
-</Card>
-
+<CardGroup cols={3}>
+  <Card title="Ministry Hub" icon="guitar" href="/features/worship-module">
+    Access worship tools, song library, and setlists.
+  </Card>
+  <Card title="Church Center" icon="users" href="/features/people-management">
+    Manage people, teams, reports, and administration.
+  </Card>
+  <Card title="Social Hub" icon="hashtag" href="/guides/getting-started">
+    Handle media and communication tasks.
+  </Card>
 </CardGroup>
 
 <Note>
-  **Need help?** See our [full documentation](https://mintlify.com/docs) or join our [community](https://mintlify.com/community).
+The system shows only the hubs you have permission to access based on your assigned roles.
 </Note>
+
+## Setting Up Worship Module
+
+If you're a worship leader or have music ministry responsibilities:
+
+### Adding Your First Song
+
+<Steps>
+  <Step title="Navigate to Song Library">
+    From the Ministry Hub dashboard, click **Songs** to access your song library.
+  </Step>
+  
+  <Step title="Create New Song">
+    Click **New Song** and enter:
+    - Song title
+    - Artist/composer
+    - Copyright information
+    - Original key
+  </Step>
+  
+  <Step title="Add Chord Sheet">
+    MinistryHub supports **ChordPro format** for chord sheets:
+    
+    ```chordpro
+    {title: Amazing Grace}
+    {artist: John Newton}
+    {key: G}
+    
+    [G]Amazing [G7]grace how [C]sweet the [G]sound
+    That saved a [D]wretch like [D7]me
+    [G]I once was [G7]lost but [C]now I'm [G]found
+    Was [Em]blind but [D]now I [G]see
+    ```
+    
+    <Tip>
+    The ChordPro format allows automatic transposition. When you change the key, all chords update automatically.
+    </Tip>
+  </Step>
+  
+  <Step title="Save and Transpose">
+    After saving, you can transpose the song to any key using the key selector. The system automatically adjusts all chords while preserving the lyrics.
+  </Step>
+</Steps>
+
+### Creating Your First Setlist
+
+Setlists help you organize songs for specific services or events.
+
+<Steps>
+  <Step title="Go to Playlists">
+    From the Ministry Hub, navigate to **Playlists** (setlists).
+  </Step>
+  
+  <Step title="Create New Playlist">
+    Click **New Playlist** and provide:
+    - Playlist name (e.g., "Sunday Service - March 10")
+    - Service date and time
+    - Description or notes
+  </Step>
+  
+  <Step title="Add Songs">
+    Search and add songs from your library. Drag to reorder them in your preferred sequence.
+  </Step>
+  
+  <Step title="Assign Musicians">
+    For each song or the entire set, assign team members to specific instruments:
+    - Lead Vocals
+    - Guitar
+    - Keys
+    - Drums
+    - Bass
+  </Step>
+</Steps>
+
+## Managing People & Teams
+
+For administrators and team leaders in the Church Center:
+
+### Inviting New Members
+
+<Steps>
+  <Step title="Access People Management">
+    From Church Center, go to **People** → **Invite Person**.
+  </Step>
+  
+  <Step title="Enter Member Details">
+    Provide:
+    - Full name
+    - Email address
+    - Area and team assignment
+    - Role (Member or Leader)
+    
+    <Info>
+    You can customize invitation email templates in Settings → Invitations.
+    </Info>
+  </Step>
+  
+  <Step title="Send Invitation">
+    The system sends a secure email with a time-limited invitation link. The recipient creates their password to complete registration.
+  </Step>
+  
+  <Step title="Track Invitation Status">
+    View pending invitations in People → Approvals to see who hasn't accepted yet.
+  </Step>
+</Steps>
+
+### Role-Based Access Control
+
+MinistryHub uses a flexible permission system:
+
+<CardGroup cols={2}>
+  <Card title="Member" icon="user">
+    Basic access to assigned teams and ministry areas. Can view and participate but cannot modify church structure.
+  </Card>
+  <Card title="Admin" icon="user-tie">
+    Full control over a specific church including managing people, teams, areas, and settings.
+  </Card>
+  <Card title="Leader" icon="user-shield">
+    Team-level permissions. Can manage their specific team, approve changes, and assign members.
+  </Card>
+  <Card title="Master" icon="user-crown">
+    Global access to all churches in the system. Used for multi-site oversight and system administration.
+  </Card>
+</CardGroup>
+
+<Warning>
+Be careful when assigning **Master** role - it grants unrestricted access to all churches and data in your organization.
+</Warning>
+
+## Using the Ushers Module
+
+For those tracking attendance and visitors:
+
+### Recording Service Attendance
+
+<Steps>
+  <Step title="Open Ushers Dashboard">
+    From Church Center, navigate to **Ushers** to see upcoming meetings.
+  </Step>
+  
+  <Step title="Select Service">
+    Choose the service you're tracking from the list of scheduled meetings.
+  </Step>
+  
+  <Step title="Enter Attendance Count">
+    Record the number of:
+    - Adults present
+    - Children present
+    - Total attendance
+    
+    This data feeds into your church reports.
+  </Step>
+  
+  <Step title="Log Visitors (Optional)">
+    If you have first-time visitors, use the visitor registration flow to capture:
+    - Name and contact information
+    - How they heard about your church
+    - Follow-up preferences
+  </Step>
+</Steps>
+
+## Switching Between Churches
+
+If you have access to multiple churches or campuses:
+
+1. Click the **church selector** in the top navigation
+2. Choose the church you want to switch to
+3. Your dashboard and available hubs update automatically based on your permissions in that church
+
+<Note>
+Your role and permissions may differ between churches. The interface adapts to show only what you can access.
+</Note>
+
+## Mobile Access
+
+MinistryHub is fully responsive and optimized for mobile devices. Access all features from your phone or tablet:
+
+- View and transpose songs during practice
+- Check setlists before service
+- Record attendance on the go
+- Manage team schedules from anywhere
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Architecture Overview" icon="sitemap" href="/architecture">
+    Learn about MinistryHub's technical architecture and multi-hub concept.
+  </Card>
+  <Card title="User Settings" icon="gear" href="/guides/getting-started">
+    Customize your profile, notifications, and preferences.
+  </Card>
+</CardGroup>
+
+<Tip>
+Explore the platform at your own pace. The guided wizard ensures you won't miss critical setup steps, and you can always return to configure additional settings later.
+</Tip>

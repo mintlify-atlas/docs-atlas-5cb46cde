@@ -1,0 +1,633 @@
+---
+title: "Request Lifecycle"
+description: "How HTTP requests flow through MinistryHub from browser to database and back"
+---
+
+## Overview
+
+MinistryHub uses a hybrid architecture where:
+- **Frontend**: React SPA handles routing client-side
+- **Backend**: PHP API processes data requests
+- **Web Server**: Apache `.htaccess` routes requests intelligently
+
+This page traces a request from the user's browser through the entire system.
+
+---
+
+## Folder Structure
+
+The system separates public and private code for maximum security:
+
+```text
+/ (Server Root)
+├── backend/                    # PRIVATE CORE (unreachable via URL)
+│   ├── config/
+│   │   └── database.env        # DB credentials, JWT secret
+│   ├── src/
+│   │   ├── Controllers/        # API route handlers
+│   │   ├── Repositories/       # Database queries
+│   │   ├── Middleware/         # Security filters
+│   │   ├── Helpers/            # Response, Logger, CORS
+│   │   ├── Database.php        # PDO connection manager
+│   │   ├── Jwt.php             # Token encoding/decoding
+│   │   └── bootstrap.php       # Autoloader + initialization
+│   └── logs/                   # Application logs (writable)
+│
+└── public_html/                # PUBLIC ACCESS (document root)
+    ├── assets/                 # React build output (JS/CSS)
+    ├── api/
+    │   └── index.php           # Single API entry point
+    ├── .htaccess               # Request routing logic
+    └── index.html              # React SPA entry point
+```
+
+### Security Benefits
+
+<Warning>
+  The `backend/` folder is a **sibling** of `public_html/`, not inside it. This means:
+  - Sensitive configuration files cannot be accessed via URL
+  - Source code is hidden from web requests
+  - Only `public_html/` is exposed to the internet
+</Warning>
+
+---
+
+## Request Types
+
+MinistryHub handles two types of requests:
+
+1. **Page Navigation** → Serve React SPA (`index.html`)
+2. **API Calls** → Route to PHP backend (`api/index.php`)
+
+---
+
+## Lifecycle 1: Page Navigation
+
+When a user visits `https://church.com/worship/songs`:
+
+### Step 1: Browser Request
+
+```http
+GET /worship/songs HTTP/1.1
+Host: church.com
+```
+
+### Step 2: .htaccess Routing
+
+Apache processes `.htaccess` rules:
+
+```apache title="public_html/.htaccess"
+RewriteEngine On
+
+# API Routing (checked first)
+RewriteRule ^api/?$ api/index.php [QSA,L]
+RewriteRule ^api/(.*)$ api/index.php [QSA,L]
+
+# SPA Routing (fallback for all non-file requests)
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule . /index.html [L]
+```
+
+**Logic:**
+1. If path starts with `/api/`, route to `api/index.php`
+2. If path is a real file (e.g., `/assets/main.js`), serve it directly
+3. Otherwise, serve `index.html` (React SPA)
+
+### Step 3: React Router Takes Over
+
+The browser receives `index.html` which loads the React app:
+
+```html title="public_html/index.html"
+<!DOCTYPE html>
+<html>
+  <head>
+    <script type="module" src="/assets/main.js"></script>
+  </head>
+  <body>
+    <div id="root"></div>
+  </body>
+</html>
+```
+
+React Router matches `/worship/songs` to the appropriate component:
+
+```typescript
+// Client-side routing
+<Route path="/worship/songs" element={<SongListPage />} />
+```
+
+**Result:** User sees the Songs page without a full page reload.
+
+---
+
+## Lifecycle 2: API Request
+
+When the Songs page needs data, it calls the API:
+
+### Step 1: Frontend API Call
+
+```typescript
+import axios from 'axios';
+
+const fetchSongs = async () => {
+  const response = await axios.get('/api/songs', {
+    params: { church_id: 5 },
+    headers: {
+      Authorization: `Bearer ${localStorage.getItem('access_token')}`
+    }
+  });
+  return response.data.songs;
+};
+```
+
+### Step 2: .htaccess Routes to API
+
+```http
+GET /api/songs?church_id=5 HTTP/1.1
+Host: church.com
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+```
+
+The `.htaccess` rule matches `/api/songs` and routes to `api/index.php`:
+
+```apache
+RewriteRule ^api/(.*)$ api/index.php [QSA,L]
+```
+
+### Step 3: Bootstrap Initialization
+
+The API entry point loads the backend:
+
+```php title="public_html/api/index.php" {3}
+<?php
+
+// Load backend core (outside public_html)
+require_once __DIR__ . '/../../backend/src/bootstrap.php';
+
+use App\Controllers\SongController;
+use App\Middleware\AuthMiddleware;
+use App\Helpers\Response;
+
+// Extract route from URL
+$uri = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
+$uri = str_replace('/api/', '', $uri); // "songs"
+$parts = explode('/', trim($uri, '/'));
+$resource = $parts[0]; // "songs"
+$action = $parts[1] ?? ''; // (empty for list)
+$method = $_SERVER['REQUEST_METHOD']; // "GET"
+```
+
+**Bootstrap runs:**
+
+```php title="backend/src/bootstrap.php"
+<?php
+
+// Define project root
+define('APP_ROOT', dirname(__DIR__));
+
+// PSR-4 Autoloader
+spl_autoload_register(function ($class) {
+    $prefix = 'App\\';
+    $base_dir = __DIR__ . '/';
+    $relative_class = substr($class, strlen($prefix));
+    $file = $base_dir . str_replace('\\', '/', $relative_class) . '.php';
+    if (file_exists($file)) {
+        require $file;
+    }
+});
+
+// Initialize CORS headers
+\App\Helpers\Cors::init();
+```
+
+### Step 4: Authentication Middleware
+
+Before routing to the controller, the request must be authenticated:
+
+```php title="public_html/api/index.php" {17-19}
+// Public routes (no auth required)
+if ($resource === 'auth') {
+    $controller = new \App\Controllers\AuthController();
+    if ($action === 'login' && $method === 'POST') {
+        $controller->login();
+    }
+    exit;
+}
+
+// Protected routes (auth required)
+try {
+    $memberId = \App\Middleware\AuthMiddleware::handle();
+} catch (\Exception $e) {
+    \App\Helpers\Response::error($e->getMessage(), 401);
+    exit;
+}
+```
+
+**AuthMiddleware extracts and validates JWT:**
+
+```php title="backend/src/Middleware/AuthMiddleware.php"
+class AuthMiddleware
+{
+    public static function handle()
+    {
+        // Get Authorization header
+        $authHeader = $_SERVER['HTTP_AUTHORIZATION'] ?? '';
+
+        // Extract Bearer token
+        if (!preg_match('/Bearer\s(\S+)/', $authHeader, $matches)) {
+            throw new \Exception("Token missing", 401);
+        }
+
+        $token = $matches[1];
+        $decoded = Jwt::decode($token); // Verify signature + expiration
+
+        if (!$decoded) {
+            throw new \Exception("Unauthorized", 401);
+        }
+
+        return $decoded['uid']; // Return authenticated member ID
+    }
+}
+```
+
+### Step 5: Route to Controller
+
+Now that we have an authenticated user (`$memberId`), route to the appropriate controller:
+
+```php title="public_html/api/index.php"
+switch ($resource) {
+    case 'songs':
+        (new \App\Controllers\SongController())->handle($memberId, $action, $method);
+        break;
+
+    case 'people':
+        (new \App\Controllers\PeopleController())->handle($memberId, $action, $method);
+        break;
+
+    // ... other resources
+
+    default:
+        \App\Helpers\Response::error("Resource not found: " . $resource, 404);
+}
+```
+
+### Step 6: Controller Processes Request
+
+The `SongController` handles the GET request:
+
+```php title="backend/src/Controllers/SongController.php"
+class SongController
+{
+    public function handle($memberId, $action, $method)
+    {
+        $churchId = $_GET['church_id'] ?? null;
+
+        if ($method === 'GET') {
+            // Check permissions before proceeding
+            PermissionMiddleware::require($memberId, 'song.read', $churchId);
+            $this->list($memberId, $churchId);
+        }
+    }
+
+    private function list($memberId, $churchId)
+    {
+        // Delegate to Repository for data access
+        $songs = \App\Repositories\SongRepo::getAll($churchId);
+        Response::json(['success' => true, 'songs' => $songs]);
+    }
+}
+```
+
+### Step 7: Repository Queries Database
+
+The Repository executes the database query:
+
+```php title="backend/src/Repositories/SongRepo.php"
+class SongRepo
+{
+    public static function getAll($churchId = null)
+    {
+        $db = \App\Database::getInstance('music');
+
+        $sql = "SELECT * FROM songs WHERE church_id = :church_id OR church_id = 0";
+        $stmt = $db->prepare($sql);
+        $stmt->bindValue(':church_id', $churchId, PDO::PARAM_INT);
+        $stmt->execute();
+
+        return $stmt->fetchAll(); // Returns array of songs
+    }
+}
+```
+
+**Database connection (from step 7):**
+
+```php title="backend/src/Database.php"
+class Database
+{
+    public static function getInstance($configKey = 'main')
+    {
+        // Load credentials from config/database.env
+        $env = parse_ini_file(APP_ROOT . '/config/database.env');
+        $host = $env['DB_HOST'];
+        $user = $env['DB_USER'];
+        $pass = $env['DB_PASS'];
+        $name = $env['DB_NAME'];
+
+        // Create PDO connection with security settings
+        $dsn = "mysql:host=$host;dbname=$name;charset=utf8mb4";
+        $conn = new PDO($dsn, $user, $pass);
+        $conn->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+        return $conn;
+    }
+}
+```
+
+### Step 8: Response Sent to Client
+
+The `Response` helper formats the JSON output:
+
+```php title="backend/src/Helpers/Response.php"
+class Response
+{
+    public static function json($data, $status = 200)
+    {
+        http_response_code($status);
+        header('Content-Type: application/json');
+        echo json_encode($data);
+        exit;
+    }
+}
+```
+
+**HTTP Response:**
+
+```json
+HTTP/1.1 200 OK
+Content-Type: application/json
+
+{
+  "success": true,
+  "songs": [
+    {
+      "id": 1,
+      "title": "Amazing Grace",
+      "artist": "John Newton",
+      "key": "G"
+    }
+  ]
+}
+```
+
+### Step 9: Frontend Receives Data
+
+Axios receives the response and React updates the UI:
+
+```typescript
+const [songs, setSongs] = useState([]);
+
+useEffect(() => {
+  fetchSongs().then(data => setSongs(data));
+}, []);
+
+return (
+  <div>
+    {songs.map(song => (
+      <SongCard key={song.id} song={song} />
+    ))}
+  </div>
+);
+```
+
+---
+
+## Complete Flow Diagram
+
+```mermaid
+sequenceDiagram
+    participant User
+    participant Browser
+    participant Apache
+    participant React
+    participant API
+    participant Auth
+    participant Controller
+    participant Repository
+    participant Database
+
+    User->>Browser: Visit /worship/songs
+    Browser->>Apache: GET /worship/songs
+    Apache->>Apache: Check .htaccess rules
+    Apache->>Browser: Serve index.html
+    Browser->>React: Load React app
+    React->>Browser: Render SongListPage
+    
+    React->>API: GET /api/songs (with JWT)
+    API->>Auth: Validate JWT token
+    Auth->>API: Return member_id
+    API->>Controller: Route to SongController
+    Controller->>Repository: SongRepo::getAll()
+    Repository->>Database: SELECT * FROM songs
+    Database->>Repository: Return rows
+    Repository->>Controller: Return array
+    Controller->>API: JSON response
+    API->>React: { success: true, songs: [...] }
+    React->>Browser: Update UI with songs
+    Browser->>User: Display song list
+```
+
+---
+
+## Authorization Header Handling
+
+<Warning>
+  Some PHP environments don't expose the `Authorization` header by default. MinistryHub handles this.
+</Warning>
+
+**.htaccess ensures header is visible:**
+
+```apache title="public_html/.htaccess"
+# Ensure Authorization header is visible to PHP
+RewriteCond %{HTTP:Authorization} ^(.*)
+RewriteRule .* - [e=HTTP_AUTHORIZATION:%1]
+```
+
+**Middleware checks multiple sources:**
+
+```php title="backend/src/Middleware/AuthMiddleware.php"
+$authHeader = '';
+
+// Try multiple methods to retrieve the header
+if (!empty($_SERVER['HTTP_AUTHORIZATION'])) {
+    $authHeader = $_SERVER['HTTP_AUTHORIZATION'];
+}
+elseif (!empty($_SERVER['REDIRECT_HTTP_AUTHORIZATION'])) {
+    $authHeader = $_SERVER['REDIRECT_HTTP_AUTHORIZATION'];
+}
+elseif (!empty($_GET['token'])) {
+    // Fallback for Server-Sent Events (SSE) where headers can't be set
+    $authHeader = 'Bearer ' . $_GET['token'];
+}
+```
+
+---
+
+## Error Handling
+
+### Global Exception Handler
+
+All uncaught exceptions are logged and returned as JSON:
+
+```php title="backend/src/bootstrap.php"
+set_exception_handler(function ($e) {
+    $msg = "Uncaught Exception: " . $e->getMessage() . "\n" .
+        "File: " . $e->getFile() . ":" . $e->getLine();
+    \App\Helpers\Logger::error($msg);
+    \App\Helpers\Response::error(
+        "Ocurrió un error interno en el servidor.", 
+        500
+    );
+});
+```
+
+### Controlled Error Responses
+
+```php
+// 400 Bad Request
+Response::error("Missing required field: email", 400);
+
+// 401 Unauthorized
+Response::error("Invalid credentials", 401);
+
+// 403 Forbidden
+Response::error("You don't have permission to delete songs", 403);
+
+// 404 Not Found
+Response::error("Song not found", 404);
+
+// 500 Internal Server Error
+Response::error("Database connection failed", 500);
+```
+
+---
+
+## CORS Configuration
+
+**Why CORS is needed:**
+During development, React runs on `localhost:5173` while the API is on `localhost` or a different domain.
+
+```php title="backend/src/Helpers/Cors.php"
+class Cors
+{
+    public static function init()
+    {
+        $origin = $_SERVER['HTTP_ORIGIN'] ?? '';
+        $allowed_origins = [
+            'http://localhost:5173',  // Vite dev server
+            'http://localhost:4173',  // Vite preview
+            'https://musicservicemanager.net'
+        ];
+
+        if (in_array($origin, $allowed_origins)) {
+            header("Access-Control-Allow-Origin: $origin");
+            header("Access-Control-Allow-Credentials: true");
+        }
+
+        header("Access-Control-Allow-Methods: GET, POST, OPTIONS, PUT, DELETE");
+        header("Access-Control-Allow-Headers: Content-Type, Authorization");
+
+        // Handle preflight OPTIONS request
+        if ($_SERVER['REQUEST_METHOD'] == 'OPTIONS') {
+            http_response_code(200);
+            exit;
+        }
+    }
+}
+```
+
+**CORS is initialized in bootstrap:**
+
+```php title="backend/src/bootstrap.php"
+\App\Helpers\Cors::init(); // First thing after autoloader
+```
+
+---
+
+## Performance Considerations
+
+### Request Optimization
+
+1. **Single Entry Point**: All API requests go through one file (`api/index.php`)
+2. **Lazy Loading**: Frontend code-splits by route
+3. **Prepared Statements**: Database queries are cached by MySQL
+4. **JWT Caching**: Secret key is cached to avoid repeated file reads
+
+### Logging & Monitoring
+
+```php
+Logger::info("Auth success: User ($email) authenticated.");
+Logger::error("DB Connection Error: " . $e->getMessage());
+```
+
+Logs are written to `backend/logs/app.log` for debugging production issues.
+
+---
+
+## Deployment Checklist
+
+<Steps>
+  <Step title="Build Frontend">
+    ```bash
+    cd frontend
+    npm run build
+    ```
+    This creates `frontend/dist/` with optimized assets.
+  </Step>
+
+  <Step title="Upload Files">
+    - Upload `frontend/dist/*` to `public_html/`
+    - Upload `backend/` folder to **parent of** `public_html/`
+  </Step>
+
+  <Step title="Configure Database">
+    Create `backend/config/database.env`:
+    ```ini
+    DB_HOST=localhost
+    DB_USER=your_user
+    DB_PASS=your_password
+    DB_NAME=ministryhub
+    JWT_SECRET=your-random-secret-key
+    RECAPTCHA_SECRET_KEY=your-recaptcha-key
+    ```
+  </Step>
+
+  <Step title="Set Permissions">
+    ```bash
+    chmod 755 backend/logs
+    chmod 644 backend/config/database.env
+    ```
+  </Step>
+
+  <Step title="Test">
+    Visit `https://yourdomain.com/api/auth/login` to ensure the API is accessible.
+  </Step>
+</Steps>
+
+---
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Technology Stack" icon="layer-group" href="/technical/stack">
+    Explore the technologies powering MinistryHub
+  </Card>
+  <Card title="Database" icon="database" href="/technical/database">
+    Learn about the database schema and queries
+  </Card>
+  <Card title="Security" icon="shield-halved" href="/technical/security">
+    Deep dive into authentication and authorization
+  </Card>
+  <Card title="API Reference" icon="code" href="/api/authentication">
+    Complete API endpoint documentation
+  </Card>
+</CardGroup>

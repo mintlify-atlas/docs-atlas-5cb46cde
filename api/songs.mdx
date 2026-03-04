@@ -1,0 +1,528 @@
+---
+title: 'Songs API'
+description: 'Manage worship songs, song library, and collaborative editing'
+---
+
+## Overview
+
+The Songs API manages your worship song library with support for church-specific and global songs. It includes a collaborative editing workflow where members can propose changes that require approval.
+
+## Authentication
+
+All endpoints require authentication with specific permissions:
+
+- **Read**: `song.read`
+- **Create**: `song.create`
+- **Update**: `song.update`
+- **Delete**: `song.delete`
+- **Approve Edits**: `song.approve`
+
+```bash
+Authorization: Bearer YOUR_JWT_TOKEN
+```
+
+---
+
+## List Songs
+
+<Card title="GET /api/songs" icon="list">
+  Retrieve all songs in the library
+</Card>
+
+**Required Permission:** `song.read`
+
+### Query Parameters
+
+<ParamField query="church_id" type="integer">
+  Filter songs by church ID. Super admins can omit this to see all songs.
+</ParamField>
+
+<ParamField query="churchId" type="integer">
+  Alternative parameter for church_id
+</ParamField>
+
+### Request
+
+```bash
+# Church-specific songs
+curl -X GET "https://your-domain.com/api/songs?church_id=1" \
+  -H "Authorization: Bearer YOUR_TOKEN"
+
+# All songs (super admin only)
+curl -X GET https://your-domain.com/api/songs \
+  -H "Authorization: Bearer YOUR_TOKEN"
+```
+
+### Response
+
+<ResponseField name="success" type="boolean">
+  Indicates if the request was successful
+</ResponseField>
+
+<ResponseField name="songs" type="array">
+  Array of song objects
+</ResponseField>
+
+```json
+{
+  "success": true,
+  "songs": [
+    {
+      "id": 1,
+      "church_id": 1,
+      "church_name": "First Baptist Church",
+      "title": "Great Are You Lord",
+      "artist": "All Sons & Daughters",
+      "original_key": "C",
+      "tempo": "72 BPM",
+      "category": "Worship",
+      "content": "[Verse 1]\nYou give life...",
+      "created_at": "2024-01-15 10:30:00"
+    },
+    {
+      "id": 2,
+      "church_id": 0,
+      "church_name": null,
+      "title": "10,000 Reasons",
+      "artist": "Matt Redman",
+      "original_key": "G",
+      "tempo": "73 BPM",
+      "category": "Praise",
+      "content": "[Chorus]\nBless the Lord...",
+      "created_at": "2024-01-10 09:15:00"
+    }
+  ]
+}
+```
+
+**Note:** Songs with `church_id: 0` are global songs available to all churches.
+
+---
+
+## Get Song by ID
+
+<Card title="GET /api/songs/{id}" icon="music">
+  Retrieve detailed information about a specific song
+</Card>
+
+**Required Permission:** `song.read`
+
+### Request Parameters
+
+<ParamField path="id" type="integer" required>
+  The unique identifier of the song
+</ParamField>
+
+### Request
+
+```bash
+curl -X GET https://your-domain.com/api/songs/1 \
+  -H "Authorization: Bearer YOUR_TOKEN"
+```
+
+### Response
+
+```json
+{
+  "success": true,
+  "song": {
+    "id": 1,
+    "church_id": 1,
+    "title": "Great Are You Lord",
+    "artist": "All Sons & Daughters",
+    "original_key": "C",
+    "tempo": "72 BPM",
+    "category": "Worship",
+    "content": "[Verse 1]\nYou give life, You are love\nYou bring light to the darkness\n\n[Chorus]\nGreat are You Lord...",
+    "created_at": "2024-01-15 10:30:00",
+    "updated_at": "2024-02-20 14:45:00"
+  }
+}
+```
+
+### Error Response
+
+**Not Found (404)**
+```json
+{
+  "success": false,
+  "error": "Song not found"
+}
+```
+
+---
+
+## Create Song
+
+<Card title="POST /api/songs" icon="plus">
+  Add a new song to the library
+</Card>
+
+**Required Permission:** `song.create`
+
+### Request Body
+
+<ParamField body="title" type="string" required>
+  The title of the song
+</ParamField>
+
+<ParamField body="artist" type="string" required>
+  The artist or composer name
+</ParamField>
+
+<ParamField body="church_id" type="integer">
+  Church ID (0 for global songs, or specific church ID)
+</ParamField>
+
+<ParamField body="original_key" type="string">
+  The original key of the song (e.g., "C", "G", "D")
+</ParamField>
+
+<ParamField body="tempo" type="string">
+  The tempo (e.g., "72 BPM", "Moderate")
+</ParamField>
+
+<ParamField body="category" type="string">
+  Song category (e.g., "Worship", "Praise", "Prayer")
+</ParamField>
+
+<ParamField body="content" type="string">
+  Full lyrics and chords in chord-pro or plain text format
+</ParamField>
+
+### Request
+
+```bash
+curl -X POST https://your-domain.com/api/songs \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "title": "Amazing Grace",
+    "artist": "John Newton",
+    "church_id": 1,
+    "original_key": "G",
+    "tempo": "90 BPM",
+    "category": "Hymn",
+    "content": "[Verse 1]\nAmazing grace how sweet the sound\nThat saved a wretch like me"
+  }'
+```
+
+### Response
+
+```json
+{
+  "success": true,
+  "id": 15,
+  "message": "Song created"
+}
+```
+
+### Error Responses
+
+**Missing Required Fields (400)**
+```json
+{
+  "success": false,
+  "error": "Title and Artist are required"
+}
+```
+
+**Creation Failed**
+```json
+{
+  "success": false,
+  "error": "Failed to create song"
+}
+```
+
+---
+
+## Update Song
+
+<Card title="PUT /api/songs/{id}" icon="pen">
+  Update an existing song
+</Card>
+
+**Required Permission:** `song.update`
+
+### Request Parameters
+
+<ParamField path="id" type="integer" required>
+  The ID of the song to update
+</ParamField>
+
+<ParamField body="title" type="string">
+  Updated title
+</ParamField>
+
+<ParamField body="artist" type="string">
+  Updated artist
+</ParamField>
+
+<ParamField body="original_key" type="string">
+  Updated key
+</ParamField>
+
+<ParamField body="tempo" type="string">
+  Updated tempo
+</ParamField>
+
+<ParamField body="category" type="string">
+  Updated category
+</ParamField>
+
+<ParamField body="content" type="string">
+  Updated lyrics/chords
+</ParamField>
+
+### Request
+
+```bash
+curl -X PUT https://your-domain.com/api/songs/1 \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "title": "Great Are You Lord (Updated)",
+    "original_key": "D",
+    "tempo": "75 BPM"
+  }'
+```
+
+### Response
+
+```json
+{
+  "success": true,
+  "message": "Song updated"
+}
+```
+
+---
+
+## Propose Edit
+
+<Card title="POST /api/songs/propose_edit" icon="pen-to-square">
+  Propose changes to a song (requires approval)
+</Card>
+
+**Note:** Members without `song.update` permission can propose edits that must be approved by someone with `song.approve` permission.
+
+### Request Body
+
+<ParamField body="song_id" type="integer" required>
+  The ID of the song to edit
+</ParamField>
+
+<ParamField body="data" type="object" required>
+  Object containing the proposed changes
+</ParamField>
+
+### Request
+
+```bash
+curl -X POST https://your-domain.com/api/songs/propose_edit \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "song_id": 1,
+    "data": {
+      "title": "Great Are You Lord",
+      "content": "[Verse 1]\nUpdated lyrics...",
+      "original_key": "D"
+    }
+  }'
+```
+
+### Response
+
+```json
+{
+  "success": true,
+  "message": "Edición propuesta"
+}
+```
+
+---
+
+## List Pending Edits
+
+<Card title="GET /api/songs/edits" icon="clock">
+  Retrieve all pending song edit proposals
+</Card>
+
+**Required Permission:** `song.approve`
+
+### Request
+
+```bash
+curl -X GET https://your-domain.com/api/songs/edits \
+  -H "Authorization: Bearer YOUR_TOKEN"
+```
+
+### Response
+
+```json
+{
+  "success": true,
+  "edits": [
+    {
+      "id": 3,
+      "song_id": 1,
+      "song_title": "Great Are You Lord",
+      "proposed_by_member_id": 12,
+      "proposed_by_name": "Emily Davis",
+      "proposed_data": {
+        "title": "Great Are You Lord",
+        "original_key": "D",
+        "content": "Updated lyrics..."
+      },
+      "status": "pending",
+      "created_at": "2024-03-15 10:30:00"
+    }
+  ]
+}
+```
+
+---
+
+## Resolve Edit Proposal
+
+<Card title="POST /api/songs/resolve_edit" icon="check-double">
+  Approve or reject a proposed song edit
+</Card>
+
+**Required Permission:** `song.approve`
+
+### Request Body
+
+<ParamField body="id" type="integer" required>
+  The ID of the edit proposal
+</ParamField>
+
+<ParamField body="status" type="string" required>
+  Resolution status: "approved" or "rejected"
+</ParamField>
+
+### Request (Approve)
+
+```bash
+curl -X POST https://your-domain.com/api/songs/resolve_edit \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "id": 3,
+    "status": "approved"
+  }'
+```
+
+### Request (Reject)
+
+```bash
+curl -X POST https://your-domain.com/api/songs/resolve_edit \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "id": 3,
+    "status": "rejected"
+  }'
+```
+
+### Response
+
+```json
+{
+  "success": true,
+  "message": "Edición aprobada"
+}
+```
+
+**When approved:** The proposed changes are applied to the song.
+
+---
+
+## Delete Song
+
+<Card title="DELETE /api/songs/{id}" icon="trash">
+  Delete a song from the library
+</Card>
+
+**Required Permission:** `song.delete`
+
+### Request Parameters
+
+<ParamField path="id" type="integer" required>
+  The ID of the song to delete
+</ParamField>
+
+### Request
+
+```bash
+curl -X DELETE https://your-domain.com/api/songs/1 \
+  -H "Authorization: Bearer YOUR_TOKEN"
+```
+
+### Response
+
+```json
+{
+  "success": true,
+  "message": "Song deleted"
+}
+```
+
+---
+
+## Song Categories
+
+Common category values:
+
+- `Worship` - Worship and adoration songs
+- `Praise` - Celebratory praise songs
+- `Prayer` - Prayer and meditation songs
+- `Hymn` - Traditional hymns
+- `Contemporary` - Modern worship songs
+- `Gospel` - Gospel music
+
+---
+
+## Global vs Church Songs
+
+| church_id | Visibility | Use Case |
+|-----------|------------|----------|
+| `0` | All churches | Standard worship songs, hymns |
+| `1+` | Specific church | Church-specific arrangements, original songs |
+
+---
+
+## Collaborative Editing Workflow
+
+1. **Member proposes edit** → Creates pending edit record
+2. **Approver reviews** → Views pending edits via `/api/songs/edits`
+3. **Approver resolves** → Approves or rejects via `/api/songs/resolve_edit`
+4. **If approved** → Changes are applied to the song
+5. **Activity logged** → Tracks who approved/rejected
+
+---
+
+## Error Codes
+
+| Code | Description |
+|------|-------------|
+| 400 | Bad Request - Missing required fields |
+| 401 | Unauthorized - Invalid or missing token |
+| 403 | Forbidden - Insufficient permissions |
+| 404 | Not Found - Song doesn't exist |
+| 500 | Internal Server Error |
+
+---
+
+## Related APIs
+
+<CardGroup cols={2}>
+  <Card title="Playlists" icon="list-music" href="/api/playlists">
+    Organize songs into playlists
+  </Card>
+  <Card title="Calendar" icon="calendar" href="/api/calendar">
+    Schedule songs for services
+  </Card>
+</CardGroup>

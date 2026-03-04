@@ -1,0 +1,321 @@
+---
+title: Calendar & Meetings
+description: Schedule services, coordinate teams, and manage event assignments with integrated calendar and meeting planning
+icon: calendar
+---
+
+The Calendar & Meetings module helps you organize church services, coordinate volunteers, and ensure everyone knows when and where they're needed. From weekly services to special events, manage your entire schedule in one place.
+
+## Calendar Overview
+
+Access the church calendar from **Church Center → Calendar** to view all scheduled events.
+
+### View Modes
+
+<Tabs>
+  <Tab title="List View">
+    Chronological list of upcoming meetings with dates, times, and quick details. Best for seeing what's coming up at a glance.
+  </Tab>
+  
+  <Tab title="Grid View">
+    Monthly calendar grid showing all events. Color-coding helps distinguish event types. Best for planning and spotting schedule conflicts.
+  </Tab>
+</Tabs>
+
+Switch between views using the toggle in the calendar header.
+
+### Filtering Events
+
+Focus on specific events:
+
+- **Date Range**: Show events between start and end dates
+- **Event Type**: Filter by service type, special events, or meetings
+- **My Assignments**: View only events where you're assigned
+
+## Creating Meetings
+
+Users with the `meeting.create` permission can schedule new events:
+
+### Basic Meeting Setup
+
+1. Navigate to **Calendar** and click **Create Meeting**
+2. Enter meeting details:
+   - **Title**: Name of the event (e.g., "Sunday Morning Service")
+   - **Description**: Additional details or notes
+   - **Date & Time**: When the event starts and ends
+   - **Location**: Where the event takes place
+3. Click **Save** to publish the meeting
+
+The meeting immediately appears on the calendar for all church members to see.
+
+<Info>
+Meetings are church-specific. Only members of the relevant church can view and access meeting details.
+</Info>
+
+### Meeting Details
+
+Each meeting can include:
+
+- **Order of Service**: Detailed timeline of service segments
+- **Assigned Team Members**: Who's serving in which role
+- **Attached Setlist**: Linked worship playlist for the service
+- **Instrument Assignments**: Which musicians are playing what
+- **Special Notes**: Important reminders or instructions
+
+## Team Assignments
+
+Coordinate volunteers and staff by assigning people to meetings.
+
+### Assigning Members
+
+Users with the `meeting.update` permission can assign team members:
+
+1. Open the meeting detail page
+2. Click **Assign Team Member**
+3. Select the member from the directory
+4. Choose their role for this meeting:
+   - Worship Leader
+   - Singer
+   - Musician (specify instrument)
+   - Sound Engineer
+   - Usher
+   - Other custom roles
+5. If applicable, select their instrument
+6. Click **Assign**
+
+### Assignment Data
+
+When assigning members, you have access to:
+
+- **Available Members**: All active members in your church
+- **Instruments**: Configured instrument list (guitar, keys, drums, etc.)
+- **Playlists**: Setlists that can be attached to the meeting
+
+This data is fetched dynamically from the `/api/calendar/assignment-data` endpoint.
+
+<Tip>
+Assign team members as early as possible. This gives them time to prepare and helps you identify scheduling conflicts.
+</Tip>
+
+## Notifications
+
+### Assignment Notifications
+
+When someone is assigned to a meeting, they automatically receive:
+
+1. **In-App Notification**: Alert in their notification center
+2. **Email Notification** (if enabled): Email with meeting details
+
+Notifications include:
+
+- Meeting title and date/time
+- Their assigned role
+- Link to view full meeting details
+- Option to accept or decline (future enhancement)
+
+### Notification Content
+
+**Subject**: Nueva asignación (New Assignment)  
+**Body**: "Has sido asignado a la reunión: [Meeting Title]"  
+**Action**: Link directly to the meeting page
+
+Notifications appear in the notification bell icon in the header and in the user's notification panel.
+
+## Linking Setlists to Meetings
+
+Connect worship setlists to calendar meetings for seamless preparation:
+
+1. Open the meeting detail page
+2. Click **Attach Setlist**
+3. Select a setlist from the dropdown
+4. Save the link
+
+Now all assigned worship team members can:
+
+- View the complete song list for the service
+- See which keys are being used
+- Access chord charts and lyrics
+- Practice songs in advance
+
+The setlist appears prominently on the meeting detail page, and team members can click through to see full song details.
+
+<Note>
+Only one setlist can be attached per meeting. If you need multiple sets (e.g., separate worship and communion sets), create those as separate meetings or combine songs into one setlist.
+</Note>
+
+## Instrument Management
+
+### Available Instruments
+
+Administrators can configure the list of instruments used in your church:
+
+- Acoustic Guitar
+- Electric Guitar
+- Bass Guitar
+- Keyboard/Piano
+- Drums
+- Percussion
+- Violin
+- Other custom instruments
+
+Instruments appear in the assignment dropdown when coordinating meetings.
+
+### Musician Assignments
+
+When assigning musicians to a meeting:
+
+1. Select the member
+2. Set their role as "Musician" or "Worship Team"
+3. Choose their instrument from the dropdown
+4. The assignment displays: "[Name] - [Instrument]"
+
+This helps worship leaders quickly see if all instrumental parts are covered.
+
+## Meeting Status and Activity Logging
+
+All meeting-related actions are logged:
+
+- **Meeting created**: Who created it and when
+- **Member assigned**: Who assigned whom to what role
+- **Setlist attached**: Which setlist was linked
+- **Meeting updated**: Any changes to title, time, or details
+
+Activity logs help with:
+
+- Accountability and oversight
+- Troubleshooting scheduling issues
+- Historical reporting ("How many services did we hold last quarter?")
+
+View activity logs from **Church Center → Reports → Activity**.
+
+## Calendar Integration
+
+### Default Calendar
+
+Each church has a default calendar automatically created during setup. This ensures:
+
+- Meetings always have a valid calendar association
+- Church-specific events are isolated from other organizations
+- Future support for multiple calendar types (services, meetings, classes)
+
+The system automatically assigns new meetings to the church's default calendar.
+
+### Meeting Instances
+
+The calendar API returns meeting data as "instances" rather than raw records:
+
+- Each instance represents a scheduled occurrence
+- Includes full meeting details, assignments, and setlist data
+- Future enhancement: Support for recurring meetings with multiple instances
+
+## Viewing Meeting Details
+
+Click any meeting on the calendar to see:
+
+### Overview Section
+
+- Meeting title and description
+- Date, time, and location
+- Creator and creation date
+
+### Assignments Section
+
+List of all assigned team members with:
+
+- Member name and profile photo
+- Assigned role
+- Instrument (if applicable)
+- Contact information (for coordinators)
+
+### Worship Section (if setlist attached)
+
+- Setlist name
+- List of songs with keys
+- Link to full setlist details
+- Quick preview of first few songs
+
+### Notes Section
+
+Free-form text field for:
+
+- Special instructions
+- Order of service outline
+- Technical requirements
+- Last-minute changes
+
+<Warning>
+All assigned team members can view meeting details. Avoid including confidential information in meeting notes.
+</Warning>
+
+## Permissions and Access Control
+
+Calendar access is controlled by permissions:
+
+| Permission | Description | Typical Roles |
+|-----------|-------------|---------------|
+| `calendar.read` | View calendar and meeting details | All members |
+| `meeting.create` | Create new meetings and events | Admin, Leader |
+| `meeting.update` | Edit meetings and assign team members | Admin, Leader |
+
+<Info>
+All active members can view the calendar and see meetings. Only users with create/update permissions can modify events.
+</Info>
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Schedule Services in Advance">
+    Create meetings at least 2-3 weeks ahead to give team members adequate preparation time and allow for availability confirmation.
+  </Accordion>
+  
+  <Accordion title="Use Consistent Naming">
+    Establish naming conventions for recurring services (e.g., "Sunday Morning Service - [Date]") to make the calendar easy to scan.
+  </Accordion>
+  
+  <Accordion title="Attach Setlists Early">
+    Link worship setlists to meetings as soon as they're finalized. Musicians appreciate extra time to learn new songs.
+  </Accordion>
+  
+  <Accordion title="Assign Roles Clearly">
+    Use specific role names ("Lead Singer" not just "Singer") so team members know exactly what's expected.
+  </Accordion>
+  
+  <Accordion title="Confirm Assignments">
+    Follow up with assigned team members to ensure they received notifications and are available. Personal confirmation prevents gaps.
+  </Accordion>
+  
+  <Accordion title="Document Special Events">
+    Use the description and notes fields for special services (Easter, Christmas, guest speakers) to communicate unique requirements.
+  </Accordion>
+</AccordionGroup>
+
+## Mobile Experience
+
+The calendar is fully responsive:
+
+**Mobile View**  
+- Card-based list of upcoming meetings
+- Swipe to see meeting details
+- Tap to expand full information
+- One-tap access to contact assigned members
+
+**Desktop View**  
+- Full monthly grid calendar
+- Sidebar with meeting details
+- Drag-and-drop for rescheduling (future enhancement)
+- Multi-select for bulk actions
+
+## Future Enhancements
+
+Planned features for the calendar module:
+
+- **Recurring Meetings**: Create weekly/monthly recurring services automatically
+- **Availability Tracking**: Let members mark when they're unavailable
+- **Accept/Decline**: Allow assigned members to confirm or decline assignments
+- **Calendar Export**: Sync with external calendars (Google, Outlook, iCal)
+- **Reminders**: Automated reminders sent before meetings
+- **Check-In**: Track attendance and punctuality
+
+<Note>
+Have suggestions for calendar features? Contact your system administrator or use the feedback option in the platform.
+</Note>

@@ -1,0 +1,400 @@
+---
+title: "Technology Stack"
+description: "Complete overview of MinistryHub's modern tech stack and architectural decisions"
+---
+
+## Overview
+
+MinistryHub is built with a **"The Right Tool for the Right Task"** philosophy, combining modern frontend technologies with a robust backend architecture designed for performance and security.
+
+## Frontend Stack
+
+### Core Framework
+
+**React 19 with TypeScript**
+- Latest stable React version with strict typing
+- Enhanced type safety and developer experience
+- Modern hooks and concurrent features
+
+**Vite 7**
+- Ultra-fast development server with HMR (Hot Module Replacement)
+- Optimized production builds with code splitting
+- Native ES modules support
+
+```json title="frontend/package.json"
+{
+  "dependencies": {
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "vite": "^7.3.1",
+    "typescript": "~5.9.3"
+  }
+}
+```
+
+### Routing & State
+
+**React Router 7**
+- Client-side routing for SPA experience
+- Protected route handling
+- Seamless navigation without page reloads
+
+```typescript
+// Routes are handled client-side after initial load
+// .htaccess ensures all non-file requests serve index.html
+```
+
+### UI & Styling
+
+**Vanilla CSS with CSS Variables**
+- Custom design system with no CSS framework dependencies
+- Native Dark Mode support via CSS variables
+- Glassmorphism effects and premium micro-animations
+- Zero runtime CSS-in-JS overhead
+
+**Benefits:**
+- Maximum performance (no runtime style processing)
+- Full control over design system
+- Native browser capabilities
+- Smaller bundle size
+
+### HTTP Client
+
+**Axios 1.13+**
+- Promise-based HTTP requests
+- Request/response interceptors for JWT handling
+- Automatic error handling
+
+```typescript
+// Axios intercepts all requests to add JWT token
+axios.interceptors.request.use((config) => {
+  const token = localStorage.getItem('access_token');
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+  return config;
+});
+```
+
+### Specialized Libraries
+
+**ChordSheetJS 13.2+**
+- Music notation parsing and rendering
+- ChordPro format support
+- Dynamic transposition engine
+- Used in the Worship/Ministry Hub
+
+**Recharts 3.7+**
+- React-based charting library
+- Interactive data visualizations
+- Used for attendance stats and reports
+
+**i18next 25.8+**
+- Comprehensive internationalization
+- Support for ES, EN, PT languages
+- JSON-based translation keys (no hardcoded strings)
+- Dynamic locale switching
+
+```typescript
+// All UI text uses translation keys
+import { useTranslation } from 'react-i18next';
+
+function MyComponent() {
+  const { t } = useTranslation();
+  return <h1>{t('welcome.title')}</h1>;
+}
+```
+
+**Additional Utilities:**
+- `clsx` - Conditional className composition
+
+---
+
+## Backend Stack
+
+### Core Language & Architecture
+
+**Vanilla PHP (PSR-4)**
+- Professional, custom micro-framework approach
+- Zero external dependencies (no Composer packages)
+- PSR-4 autoloading for clean namespace organization
+- Object-oriented design patterns
+
+**Why Vanilla PHP?**
+- Maximum performance (no framework overhead)
+- Full control over request handling
+- Easy deployment on any shared hosting
+- Predictable behavior and debugging
+
+### Application Structure
+
+**Controller-Repository Pattern**
+
+```php title="backend/src/Controllers/SongController.php"
+namespace App\Controllers;
+
+class SongController
+{
+    public function handle($memberId, $action, $method)
+    {
+        // Route to appropriate action based on HTTP method
+        if ($method === 'GET') {
+            $this->list($memberId, $churchId);
+        } elseif ($method === 'POST') {
+            $this->create($memberId, $churchId, $data);
+        }
+    }
+
+    private function list($memberId, $churchId)
+    {
+        // Controller delegates data access to Repository
+        $songs = \App\Repositories\SongRepo::getAll($churchId);
+        Response::json(['success' => true, 'songs' => $songs]);
+    }
+}
+```
+
+**Separation of Concerns:**
+- **Controllers**: Handle HTTP logic, routing, validation
+- **Repositories**: Manage database queries and data persistence
+- **Helpers**: Provide utilities (Response, Logger, CORS)
+- **Middleware**: Security filters (Auth, Permissions, CORS)
+
+### PSR-4 Autoloader
+
+```php title="backend/src/bootstrap.php"
+spl_autoload_register(function ($class) {
+    $prefix = 'App\\';
+    $base_dir = __DIR__ . '/';
+
+    $len = strlen($prefix);
+    if (strncmp($prefix, $class, $len) !== 0) {
+        return;
+    }
+
+    $relative_class = substr($class, $len);
+    $file = $base_dir . str_replace('\\', '/', $relative_class) . '.php';
+
+    if (file_exists($file)) {
+        require $file;
+    }
+});
+```
+
+### Middleware System
+
+**Centralized Security Filters:**
+
+1. **CORS Middleware** - Initialized on every request
+2. **Auth Middleware** - Validates JWT tokens
+3. **Permission Middleware** - Role-based access control
+
+```php title="backend/src/Middleware/AuthMiddleware.php"
+class AuthMiddleware
+{
+    public static function handle()
+    {
+        // Extract Bearer token from Authorization header
+        $authHeader = $_SERVER['HTTP_AUTHORIZATION'] ?? '';
+        
+        if (!preg_match('/Bearer\s(\S+)/', $authHeader, $matches)) {
+            throw new \Exception("Token missing", 401);
+        }
+
+        $token = $matches[1];
+        $decoded = Jwt::decode($token);
+
+        if (!$decoded) {
+            throw new \Exception("Unauthorized", 401);
+        }
+
+        return $decoded['uid']; // Return authenticated member ID
+    }
+}
+```
+
+---
+
+## Database Stack
+
+### Database Engine
+
+**MySQL**
+- Relational data storage
+- Optimized indexing for multi-tenancy
+- Separate schemas for Users, Music, Calendar, etc.
+
+### Data Access
+
+**PDO (PHP Data Objects)**
+- Prepared statements (100% SQL injection protection)
+- Named parameters for clarity
+- Exception-based error handling
+
+```php title="backend/src/Database.php"
+class Database
+{
+    public static function getInstance($configKey = 'main')
+    {
+        $dsn = "mysql:host=$host;port=$port;dbname=$name;charset=utf8mb4";
+        $conn = new PDO($dsn, $user, $pass);
+        $conn->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+        $conn->setAttribute(PDO::ATTR_DEFAULT_FETCH_MODE, PDO::FETCH_ASSOC);
+        return $conn;
+    }
+}
+```
+
+**Multi-Database Support:**
+- `main` - User management, churches, roles
+- `music` - Songs, setlists, instruments
+
+---
+
+## Security Stack
+
+### Authentication
+
+**JWT (JSON Web Tokens)**
+- Stateless authentication
+- Custom implementation (no external library)
+- HS256 algorithm with secret key
+- 1-hour token expiration
+
+```php title="backend/src/Jwt.php"
+class Jwt
+{
+    public static function encode($payload)
+    {
+        $header = json_encode(['typ' => 'JWT', 'alg' => 'HS256']);
+        $signature = hash_hmac('sha256', 
+            $base64Header . "." . $base64Payload, 
+            self::getSecret(), true);
+        return $base64Header . "." . $base64Payload . "." . $base64Signature;
+    }
+}
+```
+
+**Token Storage:**
+- Stored in `localStorage` on frontend
+- Sent in `Authorization: Bearer <token>` header
+- Validated on every protected API request
+
+### Bot Protection
+
+**reCAPTCHA v3**
+- Invisible security layer (no user interaction)
+- Integrated into login endpoint
+- Score-based verification (threshold: 0.5)
+- Server-side validation in `AuthController`
+
+```php title="backend/src/Controllers/AuthController.php" {20-26}
+public function login()
+{
+    $data = json_decode(file_get_contents("php://input"), true);
+    $email = $data['email'] ?? '';
+    $password = $data['password'] ?? '';
+    $recaptchaToken = $data['recaptchaToken'] ?? '';
+
+    // Verify reCAPTCHA before attempting authentication
+    if (!$this->verifyRecaptcha($recaptchaToken)) {
+        return Response::error("Verificación de seguridad fallida", 403);
+    }
+
+    // Proceed with password verification...
+}
+```
+
+### Password Security
+
+**bcrypt Hashing**
+- PHP's native `password_hash()` and `password_verify()`
+- Automatic salt generation
+- Cost factor for future-proofing
+
+---
+
+## Development Tools
+
+### Build Optimization
+
+**Code Splitting**
+- Dynamic `import()` for lazy loading
+- Manual chunks for vendor libraries
+- Optimized bundle sizes
+
+**Vite Configuration:**
+```javascript
+// vite.config.ts
+export default defineConfig({
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          vendor: ['react', 'react-dom', 'react-router-dom'],
+          charts: ['recharts'],
+          music: ['chordsheetjs']
+        }
+      }
+    }
+  }
+});
+```
+
+### Version Control
+
+**Git**
+- Standard version control
+- Feature branch workflow
+
+### Docker (Development)
+
+**Local Environment**
+- Containerized development setup
+- Consistent across team members
+
+---
+
+## Deployment Architecture
+
+See [Request Lifecycle](/technical/request-lifecycle) for detailed deployment structure.
+
+**Key Principles:**
+- **Frontend**: Static build deployed to `public_html/`
+- **Backend**: PHP core in `backend/` (sibling to public_html, unreachable via URL)
+- **Configuration**: `.env` files outside web root
+- **Logs**: Writable directory outside public access
+
+---
+
+## Technology Decision Rationale
+
+| Technology | Why This Choice? |
+|------------|------------------|
+| **React 19** | Modern UI with best-in-class ecosystem |
+| **TypeScript** | Type safety prevents runtime errors |
+| **Vite** | Fastest build tool available |
+| **Vanilla CSS** | Maximum performance, zero runtime cost |
+| **Vanilla PHP** | No framework overhead, easy hosting |
+| **PDO** | Industry-standard database security |
+| **JWT** | Stateless auth scales horizontally |
+| **MySQL** | Reliable, well-documented, universal support |
+
+---
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Request Lifecycle" icon="route" href="/technical/request-lifecycle">
+    Learn how requests flow from browser to database
+  </Card>
+  <Card title="Database" icon="database" href="/technical/database">
+    Explore the schema and data access patterns
+  </Card>
+  <Card title="Security" icon="shield" href="/technical/security">
+    Deep dive into authentication and authorization
+  </Card>
+  <Card title="Architecture Overview" icon="diagram-project" href="/architecture">
+    See the high-level system design
+  </Card>
+</CardGroup>

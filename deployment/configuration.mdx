@@ -1,0 +1,605 @@
+---
+title: Configuration
+description: Configure MinistryHub for your environment
+---
+
+## Environment Configuration
+
+MinistryHub uses environment files to manage configuration across different environments. Configuration is split between frontend and backend.
+
+## Backend Configuration
+
+### Database Environment File
+
+The backend reads all configuration from `backend/config/database.env`. This file is loaded by multiple components:
+
+- `backend/src/Database.php` - Database connections
+- `backend/src/Jwt.php` - JWT token signing
+- `backend/src/Controllers/AuthController.php` - reCAPTCHA validation
+- `backend/src/Helpers/MailHelper.php` - Email configuration
+
+#### Location
+
+```text
+backend/config/database.env
+```
+
+#### Required Variables
+
+```ini backend/config/database.env
+# ===========================
+# Main Database Configuration
+# ===========================
+DB_HOST=localhost
+DB_PORT=3306
+DB_USER=ministryhub_user
+DB_PASS=secure_password_here
+DB_NAME=ministryhub_main
+
+# ============================
+# Music Database Configuration
+# ============================
+MUSIC_DB_HOST=localhost
+MUSIC_DB_USER=ministryhub_user
+MUSIC_DB_PASS=secure_password_here
+MUSIC_DB_NAME=ministryhub_music
+
+# ==================
+# JWT Configuration
+# ==================
+JWT_SECRET=your_secure_jwt_secret_key_minimum_32_characters
+
+# ========================
+# reCAPTCHA Configuration
+# ========================
+RECAPTCHA_SECRET=your_recaptcha_v3_secret_key
+
+# =====================
+# Email Configuration
+# =====================
+# (Add if using email features)
+MAIL_HOST=smtp.gmail.com
+MAIL_PORT=587
+MAIL_USERNAME=your-email@domain.com
+MAIL_PASSWORD=your-email-password
+MAIL_FROM=noreply@your-domain.com
+MAIL_FROM_NAME=MinistryHub
+```
+
+<Warning>
+  **Never commit `database.env` to version control.** Add it to `.gitignore`:
+  ```
+  backend/config/database.env
+  ```
+</Warning>
+
+### Database Configuration Details
+
+MinistryHub uses **two separate databases**:
+
+#### Main Database (`DB_*`)
+
+Handles:
+- User accounts and authentication
+- Church organizations (multi-tenancy)
+- Members and people management
+- Teams, areas, and groups
+- Roles and permissions
+- Meetings and calendars
+- Ushers service (attendance, visitors)
+- Activity logs and notifications
+
+**SQL Schema**: `User SQL/main.sql`
+
+#### Music Database (`MUSIC_DB_*`)
+
+Handles:
+- Songs library (ChordPro format)
+- Song sections and edits
+- Playlists and setlists
+- Moderation workflow
+
+**SQL Schema**: `Music SQL/music.sql`
+
+<Info>
+  The two-database architecture allows for better organization and potential future scaling (e.g., separate servers for music content).
+</Info>
+
+### Database Connection Implementation
+
+The `Database` class uses a singleton pattern with separate instances:
+
+```php backend/src/Database.php
+// Get main database connection
+$db = Database::getInstance('main');
+
+// Get music database connection
+$musicDb = Database::getInstance('music');
+```
+
+Configuration is loaded from `backend/config/database.env`:
+
+```php
+$configPath = APP_ROOT . DIRECTORY_SEPARATOR . 'config' . DIRECTORY_SEPARATOR . 'database.env';
+$env = parse_ini_file($configPath);
+```
+
+### JWT Configuration
+
+JSON Web Tokens (JWT) are used for stateless authentication.
+
+#### JWT Secret
+
+The `JWT_SECRET` is used to sign tokens. It must be:
+- At least 32 characters long
+- Cryptographically secure
+- Unique per environment
+
+**Generate a secure secret**:
+
+<CodeGroup>
+```bash OpenSSL
+openssl rand -base64 64
+```
+
+```bash PHP
+php -r "echo bin2hex(random_bytes(32));"
+```
+
+```bash Node.js
+node -e "console.log(require('crypto').randomBytes(64).toString('base64'))"
+```
+</CodeGroup>
+
+#### JWT Implementation
+
+The JWT class (`backend/src/Jwt.php`) provides:
+
+```php
+// Encode payload
+$token = Jwt::encode([
+    'user_id' => 123,
+    'church_id' => 456,
+    'exp' => time() + (60 * 60 * 24) // 24 hours
+]);
+
+// Decode and verify
+$payload = Jwt::decode($token);
+if ($payload === null) {
+    // Token invalid or expired
+}
+```
+
+<Note>
+  If `JWT_SECRET` is missing, the system falls back to `'default_secret'` and logs a warning. **Never use the default in production.**
+</Note>
+
+### reCAPTCHA Configuration
+
+MinistryHub uses **Google reCAPTCHA v3** for invisible bot protection on authentication forms.
+
+#### Setup
+
+1. **Register your site**: https://www.google.com/recaptcha/admin
+2. **Select reCAPTCHA v3**
+3. **Add your domain(s)**
+4. **Copy the secret key** to `RECAPTCHA_SECRET`
+
+#### Usage in Backend
+
+The secret is validated in `AuthController.php`:
+
+```php backend/src/Controllers/AuthController.php
+$configPath = APP_ROOT . DIRECTORY_SEPARATOR . 'config' . DIRECTORY_SEPARATOR . 'database.env';
+$env = @parse_ini_file($configPath);
+$recaptchaSecret = $env['RECAPTCHA_SECRET'] ?? null;
+```
+
+<Tip>
+  For **development environments**, you can skip reCAPTCHA validation or use test keys:
+  - Site key: `6LeIxAcTAAAAAJcZVRqyHh71UMIEGNQ_MXjiZKhI`
+  - Secret key: `6LeIxAcTAAAAAGG-vFI1TnRWxMZNFuojJ4WifJWe`
+</Tip>
+
+## Frontend Configuration
+
+### Environment Variables
+
+Create a `.env` file in the `frontend` directory:
+
+```ini frontend/.env
+VITE_API_URL=/api
+```
+
+#### Available Variables
+
+| Variable | Description | Default |
+|----------|-------------|--------|
+| `VITE_API_URL` | API base URL | `/api` |
+
+<Info>
+  Vite exposes environment variables prefixed with `VITE_` to the client-side code via `import.meta.env`.
+</Info>
+
+### API Configuration
+
+The frontend uses Axios for API requests. Configuration is in `frontend/src/services/api.ts`:
+
+```ts frontend/src/services/api.ts
+const api = axios.create({
+    baseURL: '/api',
+    withCredentials: true,
+    headers: {
+        'Content-Type': 'application/json',
+    },
+});
+```
+
+#### Request Interceptor
+
+Automatically injects JWT tokens:
+
+```ts
+api.interceptors.request.use((config) => {
+    const token = localStorage.getItem('auth_token');
+    if (token) {
+        config.headers.Authorization = `Bearer ${token}`;
+    }
+    return config;
+});
+```
+
+#### Response Interceptor
+
+Handles authentication errors:
+
+```ts
+api.interceptors.response.use(
+    (response) => response,
+    (error) => {
+        if (error.response?.status === 401) {
+            // Handle unauthorized
+            console.warn('Unauthorized access');
+        }
+        return Promise.reject(error);
+    }
+);
+```
+
+### Build Configuration
+
+Vite configuration (`frontend/vite.config.ts`):
+
+```ts frontend/vite.config.ts
+export default defineConfig({
+  plugins: [react()],
+  build: {
+    outDir: resolve(__dirname, '../public_html'),
+    emptyOutDir: false,
+    rollupOptions: {
+      input: resolve(__dirname, 'index.html')
+    }
+  }
+})
+```
+
+**Key settings**:
+- `outDir`: Builds directly into `public_html` for easy deployment
+- `emptyOutDir: false`: Preserves existing files (like `api/` directory)
+- `input`: Entry point for the React SPA
+
+## Web Server Configuration
+
+### Apache (.htaccess)
+
+MinistryHub includes a production-ready `.htaccess` file:
+
+```apache public_html/.htaccess
+RewriteEngine On
+
+# API Routing
+RewriteRule ^api/?$ api/index.php [QSA,L]
+RewriteRule ^api/(.*)$ api/index.php [QSA,L]
+
+# Ensure Authorization header is visible to PHP
+RewriteCond %{HTTP:Authorization} ^(.*)
+RewriteRule .* - [e=HTTP_AUTHORIZATION:%1]
+
+# SPA Routing
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule . /index.html [L]
+```
+
+#### How It Works
+
+1. **API Routes**: All `/api/*` requests route to `api/index.php`
+2. **Authorization Header**: Ensures JWT tokens reach PHP (required for some server configs)
+3. **SPA Routing**: Non-existent files/directories serve `index.html` (React Router handles navigation)
+4. **Query String Append**: `[QSA]` preserves query parameters
+
+<Warning>
+  The Authorization header rewrite is **critical** for JWT authentication. Without it, `$_SERVER['HTTP_AUTHORIZATION']` will be empty.
+</Warning>
+
+### Nginx Configuration
+
+For Nginx, replicate the routing logic:
+
+```nginx
+server {
+    root /var/www/ministryhub/public_html;
+    index index.html;
+    
+    # API Routes
+    location ~ ^/api(/.*)?$ {
+        try_files $uri /api/index.php$is_args$args;
+        
+        location ~ \.php$ {
+            include snippets/fastcgi-php.conf;
+            fastcgi_pass unix:/var/run/php/php8.1-fpm.sock;
+            fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
+            
+            # Pass Authorization header
+            fastcgi_param HTTP_AUTHORIZATION $http_authorization;
+        }
+    }
+    
+    # SPA Routing
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+}
+```
+
+## PHP Configuration
+
+### Required Extensions
+
+Ensure these PHP extensions are enabled:
+
+```bash
+php -m | grep -E 'pdo|pdo_mysql|json|mbstring|openssl'
+```
+
+### Recommended php.ini Settings
+
+```ini
+# Production
+display_errors = Off
+log_errors = On
+error_log = /var/log/php_errors.log
+
+# Memory and uploads
+memory_limit = 256M
+upload_max_filesize = 10M
+post_max_size = 10M
+
+# Security
+expose_php = Off
+allow_url_fopen = Off
+```
+
+## Logging Configuration
+
+MinistryHub includes a custom Logger helper.
+
+### Log Directory
+
+```bash
+backend/logs/
+```
+
+Ensure this directory is writable by the web server:
+
+```bash
+mkdir -p backend/logs
+chmod 755 backend/logs
+chown www-data:www-data backend/logs
+```
+
+### Logger Usage
+
+The Logger class (`backend/src/Helpers/Logger.php`) provides:
+
+```php
+Logger::error("Database connection failed");
+Logger::info("User logged in: user_id=123");
+```
+
+### Global Exception Handler
+
+All uncaught exceptions are logged automatically (`bootstrap.php`):
+
+```php backend/src/bootstrap.php
+set_exception_handler(function ($e) {
+    $msg = "Uncaught Exception: " . $e->getMessage() . "\n" .
+        "File: " . $e->getFile() . ":" . $e->getLine() . "\n" .
+        "Stack trace:\n" . $e->getTraceAsString();
+    \App\Helpers\Logger::error($msg);
+    \App\Helpers\Response::error("Error interno del servidor", 500);
+});
+```
+
+## CORS Configuration
+
+CORS (Cross-Origin Resource Sharing) is initialized in `bootstrap.php`:
+
+```php
+\App\Helpers\Cors::init();
+```
+
+The `Cors` helper (`backend/src/Helpers/Cors.php`) should be configured with allowed origins:
+
+```php
+// Example CORS configuration
+$allowedOrigins = [
+    'https://your-domain.com',
+    'https://www.your-domain.com',
+];
+
+if (in_array($_SERVER['HTTP_ORIGIN'] ?? '', $allowedOrigins)) {
+    header('Access-Control-Allow-Origin: ' . $_SERVER['HTTP_ORIGIN']);
+}
+```
+
+<Note>
+  In production, **never** use `Access-Control-Allow-Origin: *` as it exposes your API to all domains.
+</Note>
+
+## Multi-Tenancy Configuration
+
+MinistryHub is designed for **multi-tenancy** where each church is a separate tenant.
+
+### Church Context
+
+- Users belong to a specific `church_id`
+- All queries filter by `church_id` automatically
+- "Master" users can switch between churches
+
+### Database Schema
+
+Key tables with `church_id`:
+
+```sql
+CREATE TABLE church (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  name VARCHAR(255) NOT NULL,
+  domain VARCHAR(100) UNIQUE,
+  -- ...
+);
+
+CREATE TABLE songs (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  church_id INT NOT NULL DEFAULT 0,
+  title VARCHAR(255) NOT NULL,
+  -- ...
+);
+
+CREATE TABLE member (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  church_id INT NOT NULL,
+  first_name VARCHAR(100) NOT NULL,
+  -- ...
+);
+```
+
+### Context Switching
+
+Users with appropriate permissions can switch church context. The JWT payload includes:
+
+```json
+{
+  "user_id": 123,
+  "church_id": 456,
+  "exp": 1234567890
+}
+```
+
+## Internationalization (i18n)
+
+MinistryHub supports multiple languages using **i18next**.
+
+### Supported Languages
+
+- **Spanish (es)** - Default
+- **English (en)**
+- **Portuguese (pt)**
+
+### Translation Files
+
+Locations:
+
+```text
+frontend/src/i18n/locales/
+├── es/
+│   └── translation.json
+├── en/
+│   └── translation.json
+└── pt/
+    └── translation.json
+```
+
+### Configuration
+
+i18next is configured in `frontend/src/i18n/`:
+
+```ts
+i18n
+  .use(LanguageDetector)
+  .use(initReactI18next)
+  .init({
+    resources: {
+      es: { translation: esTranslation },
+      en: { translation: enTranslation },
+      pt: { translation: ptTranslation },
+    },
+    fallbackLng: 'es',
+    interpolation: {
+      escapeValue: false,
+    },
+  });
+```
+
+### Usage in Components
+
+```tsx
+import { useTranslation } from 'react-i18next';
+
+function MyComponent() {
+  const { t } = useTranslation();
+  return <h1>{t('welcome_message')}</h1>;
+}
+```
+
+<Tip>
+  All UI strings should use translation keys. **Never hardcode text** in components.
+</Tip>
+
+## Environment-Specific Settings
+
+### Development
+
+```ini
+# Relaxed settings for local development
+DB_HOST=localhost
+DB_PORT=3306
+JWT_SECRET=dev_secret_not_secure
+RECAPTCHA_SECRET=test_key_6LeIxAcTAAAAAGG-vFI1TnRWxMZNFuojJ4WifJWe
+```
+
+### Staging
+
+```ini
+# Mirror production but separate database
+DB_HOST=staging-db.internal
+DB_PORT=3306
+JWT_SECRET=staging_secure_random_string_here
+RECAPTCHA_SECRET=your_staging_recaptcha_secret
+```
+
+### Production
+
+```ini
+# Maximum security
+DB_HOST=production-db.internal
+DB_PORT=3306
+DB_USER=ministryhub_prod
+JWT_SECRET=production_ultra_secure_random_string_64_chars_minimum
+RECAPTCHA_SECRET=your_production_recaptcha_secret
+```
+
+<Warning>
+  Always use **different JWT secrets** for each environment to prevent token reuse attacks.
+</Warning>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Development" icon="code" href="/deployment/development">
+    Set up local development environment
+  </Card>
+  <Card title="Production" icon="rocket" href="/deployment/production">
+    Deploy to production server
+  </Card>
+</CardGroup>

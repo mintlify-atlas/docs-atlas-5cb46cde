@@ -1,0 +1,142 @@
+---
+title: 'Authentication'
+description: 'Learn how to authenticate with the MinistryHub API using JWT tokens'
+---
+
+## Overview
+
+MinistryHub uses JWT (JSON Web Token) based authentication to secure API endpoints. All protected endpoints require a valid JWT token in the request headers.
+
+## Authentication Flow
+
+1. **Login**: Send credentials to the login endpoint
+2. **Receive Token**: Get a JWT access token with 1-hour expiration
+3. **Include Token**: Send the token in the `Authorization` header for all subsequent requests
+4. **Token Expiration**: Tokens expire after 3600 seconds (1 hour)
+
+## Login Endpoint
+
+### POST /api/auth/login
+
+Authenticate a user and receive a JWT access token.
+
+<ParamField body="email" type="string" required>
+  User's email address
+</ParamField>
+
+<ParamField body="password" type="string" required>
+  User's password
+</ParamField>
+
+<ParamField body="recaptchaToken" type="string" required>
+  Google reCAPTCHA v3 token for security verification (minimum score: 0.5)
+</ParamField>
+
+### Request Example
+
+```bash
+curl -X POST https://your-domain.com/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "user@church.org",
+    "password": "your-password",
+    "recaptchaToken": "03AGdBq24..."
+  }'
+```
+
+### Response
+
+<ResponseField name="success" type="boolean">
+  Indicates if authentication was successful
+</ResponseField>
+
+<ResponseField name="access_token" type="string">
+  JWT token to use for authenticated requests
+</ResponseField>
+
+<ResponseField name="expires_in" type="integer">
+  Token expiration time in seconds (3600 = 1 hour)
+</ResponseField>
+
+### Success Response Example
+
+```json
+{
+  "success": true,
+  "access_token": "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJ1aWQiOjEyMywiZW1haWwiOiJ1c2VyQGNodXJjaC5vcmciLCJpYXQiOjE3MDkxNjAwMDAsImV4cCI6MTcwOTE2MzYwMH0.signature",
+  "expires_in": 3600
+}
+```
+
+### Error Responses
+
+<ResponseExample>
+```json Missing Credentials
+{
+  "error": "El correo y la contraseña son obligatorios"
+}
+```
+</ResponseExample>
+
+<ResponseExample>
+```json Invalid Credentials
+{
+  "error": "Credenciales inválidas"
+}
+```
+</ResponseExample>
+
+<ResponseExample>
+```json reCAPTCHA Failed
+{
+  "error": "Verificación de seguridad fallida"
+}
+```
+</ResponseExample>
+
+## Using the Access Token
+
+Once authenticated, include the JWT token in the `Authorization` header of all API requests:
+
+```bash
+curl https://your-domain.com/api/bootstrap \
+  -H "Authorization: Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9..."
+```
+
+### Alternative Token Methods
+
+For Server-Sent Events (SSE) or situations where headers cannot be set:
+
+```bash
+# Query parameter
+curl https://your-domain.com/api/endpoint?token=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9...
+```
+
+## Protected Endpoints
+
+All endpoints except `/api/auth/*` require authentication. If a token is missing or invalid, you'll receive:
+
+```json
+{
+  "error": "Unauthorized"
+}
+```
+
+## Security Notes
+
+- Tokens expire after 1 hour
+- Store tokens securely (e.g., secure HTTP-only cookies, encrypted storage)
+- Never expose tokens in URLs (except for SSE/EventSource use cases)
+- reCAPTCHA v3 is required for login attempts
+- Password verification uses PHP's `password_verify()` with bcrypt hashing
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="JWT Token Structure" icon="key" href="/api/jwt-tokens">
+    Learn about JWT payload and token structure
+  </Card>
+  <Card title="API Reference" icon="code" href="/api/churches">
+    Explore available API endpoints
+  </Card>
+</CardGroup>

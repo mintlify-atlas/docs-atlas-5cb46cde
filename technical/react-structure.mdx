@@ -1,0 +1,368 @@
+---
+title: 'React Structure'
+description: 'Overview of the React 19 + TypeScript + Vite frontend architecture'
+---
+
+# React Structure
+
+MinistryHub's frontend is built with **React 19**, **TypeScript**, and **Vite**, delivering a modern, type-safe, and high-performance single-page application (SPA).
+
+## Technology Stack
+
+### Core Technologies
+
+| Technology | Version | Purpose |
+|------------|---------|----------|
+| **React** | 19.2.0 | UI framework with latest features |
+| **TypeScript** | ~5.9.3 | Static typing and type safety |
+| **Vite** | 7.3.1 | Ultra-fast build tool and dev server |
+| **react-router-dom** | 7.13.0 | Client-side routing |
+| **i18next** | 25.8.4 | Internationalization (ES/EN/PT) |
+| **axios** | 1.13.5 | HTTP client for API communication |
+
+### Key Dependencies
+
+```json title="package.json (excerpt)"
+{
+  "dependencies": {
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "react-router-dom": "^7.13.0",
+    "i18next": "^25.8.4",
+    "react-i18next": "^16.5.4",
+    "axios": "^1.13.5",
+    "chordsheetjs": "^13.2.1",
+    "recharts": "^3.7.0"
+  }
+}
+```
+
+## Project Structure
+
+The frontend follows a modular architecture that mirrors the multi-hub design philosophy:
+
+```text
+frontend/src/
+├── components/          # Reusable UI components
+│   ├── layout/         # Layout components (MainLayout, ProtectedRoute, etc.)
+│   ├── ui/             # Base UI components (buttons, inputs, etc.)
+│   └── dev/            # Development tools (DevProfileSelector)
+├── context/            # React Context providers
+│   ├── AuthContext.tsx # Authentication and user state
+│   ├── ThemeContext.tsx # Theme management (dark/light)
+│   └── ToastContext.tsx # Toast notifications
+├── hooks/              # Custom React hooks
+├── i18n/               # Internationalization configuration
+│   ├── config.ts       # i18next setup
+│   └── locales/        # Translation files (es.json, en.json, pt.json)
+├── modules/            # Feature modules
+│   ├── worship/        # Ministry Hub module
+│   ├── mainhub/        # Church Center module
+│   └── social/         # Social Media Hub module
+├── pages/              # Top-level page components
+├── services/           # API service layer
+├── types/              # TypeScript type definitions
+├── utils/              # Utility functions
+├── App.tsx             # Root application component
+└── main.tsx            # Application entry point
+```
+
+## Application Entry Point
+
+The application initializes in `main.tsx` with React 19's `createRoot` API:
+
+```tsx title="frontend/src/main.tsx"
+import { StrictMode } from 'react'
+import { createRoot } from 'react-dom/client'
+import './index.css'
+import './i18n/config';
+import App from './App.tsx'
+
+createRoot(document.getElementById('root')!).render(
+  <StrictMode>
+    <App />
+  </StrictMode>,
+)
+```
+
+<Note>
+  **React 19 Features**: MinistryHub leverages React 19's improved type safety, automatic batching, and performance optimizations.
+</Note>
+
+## Root Component Architecture
+
+The `App.tsx` component establishes the provider hierarchy and routing structure:
+
+```tsx title="frontend/src/App.tsx (simplified)"
+import { FC } from 'react';
+import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { ThemeProvider } from './context/ThemeContext';
+import { AuthProvider } from './context/AuthContext';
+import { ToastProvider } from './context/ToastContext';
+import { MainLayout } from './components/layout/MainLayout';
+import { ProtectedRoute } from './components/layout/ProtectedRoute';
+import { ModuleGuard } from './components/layout/ModuleGuard';
+
+const App: FC = () => {
+  return (
+    <AuthProvider>
+      <ThemeProvider>
+        <ToastProvider>
+          {import.meta.env.DEV && <DevProfileSelector />}
+          <BrowserRouter>
+            <Routes>
+              {/* Public Routes */}
+              <Route path="/login" element={<Login />} />
+              <Route path="/forgot-password" element={<ForgotPassword />} />
+              
+              {/* Protected Routes */}
+              <Route element={<ProtectedRoute />}>
+                <Route element={<MainLayout />}>
+                  <Route path="dashboard" element={<MainDashboard />} />
+                  
+                  {/* Worship Module */}
+                  <Route path="worship" element={<ModuleGuard moduleKey="worship" />}>
+                    <Route index element={<WorshipDashboard />} />
+                    <Route path="songs" element={<SongList />} />
+                    <Route path="songs/:id" element={<SongDetail />} />
+                  </Route>
+                  
+                  {/* MainHub Module */}
+                  <Route path="mainhub" element={<ModuleGuard moduleKey="mainhub" />}>
+                    <Route index element={<MainHubDashboard />} />
+                    <Route path="people" element={<PeopleList />} />
+                  </Route>
+                </Route>
+              </Route>
+            </Routes>
+          </BrowserRouter>
+        </ToastProvider>
+      </ThemeProvider>
+    </AuthProvider>
+  );
+};
+
+export default App;
+```
+
+### Provider Hierarchy
+
+The application uses a nested provider pattern for global state management:
+
+1. **AuthProvider** (Outermost) - Manages authentication, user data, and permissions
+2. **ThemeProvider** - Controls dark/light theme and syncs with user preferences
+3. **ToastProvider** - Handles application-wide toast notifications
+
+<Warning>
+  The order of providers matters! `AuthProvider` must be outermost since `ThemeProvider` depends on user data.
+</Warning>
+
+## Module Architecture
+
+MinistryHub uses a **module-based architecture** where each ministry area is isolated:
+
+### Module Structure
+
+```text
+modules/
+├── worship/              # Ministry Hub (songs, playlists, calendar)
+│   ├── pages/
+│   ├── components/
+│   └── services/
+├── mainhub/              # Church Center (people, teams, reports)
+│   ├── pages/
+│   │   ├── people/
+│   │   └── ushers/
+│   └── components/
+└── social/               # Social Media Hub
+    ├── pages/
+    └── components/
+```
+
+### Module Guard Pattern
+
+Each module is protected by a `ModuleGuard` that checks if the user has access:
+
+```tsx title="frontend/src/components/layout/ModuleGuard.tsx"
+import { FC } from 'react';
+import { Navigate, Outlet } from 'react-router-dom';
+import { useAuth } from '../../hooks/useAuth';
+
+interface ModuleGuardProps {
+  moduleKey: string;
+}
+
+export const ModuleGuard: FC<ModuleGuardProps> = ({ moduleKey }) => {
+  const { hasService, isAuthenticated, isSuperAdmin } = useAuth();
+
+  if (!isAuthenticated) {
+    return <Navigate to="/login" replace />;
+  }
+
+  // Master/Superadmin has access to everything
+  if (isSuperAdmin || hasService(moduleKey)) {
+    return <Outlet />;
+  }
+
+  // Redirect to their first available module
+  return <Navigate to="/dashboard" replace />;
+};
+```
+
+<Tip>
+  **Multi-Tenancy**: Each module can be enabled/disabled per user, allowing flexible permission management across churches.
+</Tip>
+
+## Component Patterns
+
+### TypeScript Function Components
+
+All components use TypeScript with strict typing:
+
+```tsx
+import type { FC } from 'react';
+
+interface MyComponentProps {
+  title: string;
+  onSave: (data: any) => void;
+  optional?: boolean;
+}
+
+export const MyComponent: FC<MyComponentProps> = ({ title, onSave, optional = false }) => {
+  return (
+    <div>
+      <h1>{title}</h1>
+      {/* Component logic */}
+    </div>
+  );
+};
+```
+
+### Protected Route Pattern
+
+Authentication is enforced at the route level:
+
+```tsx title="frontend/src/components/layout/ProtectedRoute.tsx"
+import { FC } from 'react';
+import { Navigate, Outlet } from 'react-router-dom';
+import { useAuth } from '../../hooks/useAuth';
+
+export const ProtectedRoute: FC = () => {
+  const { isAuthenticated, isLoading } = useAuth();
+
+  if (isLoading) {
+    return <div>Loading...</div>;
+  }
+
+  if (!isAuthenticated) {
+    return <Navigate to="/login" replace />;
+  }
+
+  return <Outlet />;
+};
+```
+
+## Vite Configuration
+
+Vite is configured to build the production bundle into the PHP backend's public directory:
+
+```ts title="frontend/vite.config.ts"
+import { defineConfig } from 'vite'
+import react from '@vitejs/plugin-react'
+import { resolve } from 'path'
+
+export default defineConfig({
+  plugins: [react()],
+  build: {
+    outDir: resolve(__dirname, '../public_html'),
+    emptyOutDir: false,
+    rollupOptions: {
+      input: resolve(__dirname, 'index.html')
+    }
+  }
+})
+```
+
+<Note>
+  The build output goes to `../public_html` to integrate with the PHP backend. See [Backend Integration](/technical/php-architecture) for details.
+</Note>
+
+## Development Environment
+
+### Running the Development Server
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+Vite will start a development server at `http://localhost:5173` with:
+- Hot Module Replacement (HMR)
+- Fast refresh for React components
+- TypeScript type checking
+
+### Environment Variables
+
+Create a `.env` file in the frontend directory:
+
+```bash title="frontend/.env"
+VITE_API_URL=http://localhost/api
+VITE_RECAPTCHA_SITE_KEY=your_recaptcha_key
+```
+
+<Warning>
+  All Vite environment variables must be prefixed with `VITE_` to be exposed to the client.
+</Warning>
+
+## Building for Production
+
+```bash
+npm run build
+```
+
+This generates optimized assets in `../public_html/assets/` with:
+- Minified JavaScript bundles
+- CSS extraction and optimization
+- Asset hashing for cache busting
+- TypeScript compilation
+
+## Key Features
+
+### Type Safety
+
+All components and services are fully typed with TypeScript, providing:
+- Autocomplete in IDEs
+- Compile-time error detection
+- Self-documenting code
+- Refactoring confidence
+
+### Performance
+
+- **Code splitting**: Routes are lazy-loaded automatically
+- **Tree shaking**: Unused code is eliminated in production
+- **Asset optimization**: Images and CSS are optimized by Vite
+- **Fast refresh**: Instant feedback during development
+
+### Developer Experience
+
+- **Mock profiles**: Development mode includes profile switching for testing different roles (see `frontend/src/App.tsx:65`)
+- **Type checking**: Run `tsc -b` to check types without building
+- **ESLint**: Code quality enforcement with React-specific rules
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Routing" icon="route" href="/technical/routing">
+    Learn how React Router manages navigation and module access
+  </Card>
+  <Card title="Internationalization" icon="language" href="/technical/internationalization">
+    Understand the i18next configuration for multi-language support
+  </Card>
+  <Card title="Context Providers" icon="circle-nodes" href="/technical/react-structure">
+    Deep dive into Auth, Theme, and Toast context management
+  </Card>
+  <Card title="API Integration" icon="plug" href="/api/authentication">
+    How the frontend communicates with the PHP backend
+  </Card>
+</CardGroup>

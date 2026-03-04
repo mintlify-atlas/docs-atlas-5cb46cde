@@ -1,0 +1,408 @@
+---
+title: 'Churches API'
+description: 'Manage churches in your multi-tenant MinistryHub platform'
+---
+
+## Overview
+
+The Churches API allows super admins to manage church organizations within the MinistryHub platform. Each church is a separate tenant with its own data, members, and settings.
+
+## Authentication
+
+All endpoints require authentication via Bearer token:
+
+```bash
+Authorization: Bearer YOUR_JWT_TOKEN
+```
+
+Most operations require the `church.update` permission. Only super admins can create, update, or delete churches.
+
+---
+
+## List All Churches
+
+<Card title="GET /api/churches" icon="list">
+  Retrieve all churches in the system
+</Card>
+
+**Required Permission:** `church.read`
+
+### Request
+
+```bash
+curl -X GET https://your-domain.com/api/churches \
+  -H "Authorization: Bearer YOUR_TOKEN"
+```
+
+### Response
+
+```json
+{
+  "success": true,
+  "churches": [
+    {
+      "id": 1,
+      "name": "First Baptist Church",
+      "slug": "first-baptist",
+      "is_active": true,
+      "created_at": "2024-01-15 10:30:00"
+    },
+    {
+      "id": 2,
+      "name": "Grace Community Church",
+      "slug": "grace-community",
+      "is_active": true,
+      "created_at": "2024-02-20 14:45:00"
+    }
+  ]
+}
+```
+
+---
+
+## Get My Churches
+
+<Card title="GET /api/churches/my_churches" icon="user">
+  Retrieve churches associated with the authenticated user
+</Card>
+
+**Required Permission:** `church.read`
+
+**Behavior:**
+- Super admins see all churches
+- Regular users see only their assigned church
+
+### Request
+
+```bash
+curl -X GET https://your-domain.com/api/churches/my_churches \
+  -H "Authorization: Bearer YOUR_TOKEN"
+```
+
+### Response
+
+```json
+{
+  "success": true,
+  "churches": [
+    {
+      "id": 1,
+      "name": "First Baptist Church",
+      "slug": "first-baptist",
+      "is_active": true
+    }
+  ]
+}
+```
+
+---
+
+## Get Church by ID
+
+<Card title="GET /api/churches/{id}" icon="building-columns">
+  Retrieve details of a specific church
+</Card>
+
+**Required Permission:** `church.read`
+
+### Request
+
+<ParamField path="id" type="integer" required>
+  The unique identifier of the church
+</ParamField>
+
+```bash
+curl -X GET https://your-domain.com/api/churches/1 \
+  -H "Authorization: Bearer YOUR_TOKEN"
+```
+
+### Response
+
+```json
+{
+  "success": true,
+  "church": {
+    "id": 1,
+    "name": "First Baptist Church",
+    "slug": "first-baptist",
+    "is_active": true,
+    "created_at": "2024-01-15 10:30:00",
+    "updated_at": "2024-03-01 09:15:00"
+  }
+}
+```
+
+### Error Response
+
+```json
+{
+  "success": false,
+  "error": "Iglesia no encontrada"
+}
+```
+
+---
+
+## Create Church
+
+<Card title="POST /api/churches" icon="plus">
+  Create a new church organization
+</Card>
+
+**Required Permission:** `church.update` (Super admin only)
+
+### Request Body
+
+<ParamField body="name" type="string" required>
+  The full name of the church
+</ParamField>
+
+<ParamField body="slug" type="string" required>
+  URL-friendly identifier for the church (must be unique)
+</ParamField>
+
+### Request
+
+```bash
+curl -X POST https://your-domain.com/api/churches \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "New Hope Church",
+    "slug": "new-hope"
+  }'
+```
+
+### Response
+
+<ResponseField name="success" type="boolean">
+  Indicates if the church was created successfully
+</ResponseField>
+
+<ResponseField name="id" type="integer">
+  The ID of the newly created church
+</ResponseField>
+
+<ResponseField name="message" type="string">
+  Success or error message
+</ResponseField>
+
+```json
+{
+  "success": true,
+  "id": 3,
+  "message": "Iglesia creada correctamente"
+}
+```
+
+### Error Responses
+
+**Missing Data (400)**
+```json
+{
+  "success": false,
+  "error": "Datos incompletos"
+}
+```
+
+**Creation Failed (500)**
+```json
+{
+  "success": false,
+  "error": "No se pudo crear la iglesia"
+}
+```
+
+---
+
+## Update Church
+
+<Card title="PUT /api/churches/{id}" icon="pen">
+  Update an existing church
+</Card>
+
+**Required Permission:** `church.update` (Super admin only)
+
+### Request Parameters
+
+<ParamField path="id" type="integer" required>
+  The ID of the church to update
+</ParamField>
+
+<ParamField body="name" type="string" required>
+  The updated name of the church
+</ParamField>
+
+<ParamField body="slug" type="string" required>
+  The updated slug for the church
+</ParamField>
+
+### Request
+
+```bash
+curl -X PUT https://your-domain.com/api/churches/1 \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "First Baptist Church - Downtown",
+    "slug": "first-baptist-downtown"
+  }'
+```
+
+### Response
+
+```json
+{
+  "success": true,
+  "message": "Iglesia actualizada"
+}
+```
+
+### Error Responses
+
+**Unauthorized (403)**
+```json
+{
+  "success": false,
+  "error": "No tienes permisos para editar iglesias"
+}
+```
+
+**Invalid ID (400)**
+```json
+{
+  "success": false,
+  "error": "ID de iglesia inválido"
+}
+```
+
+---
+
+## Delete Church
+
+<Card title="DELETE /api/churches/{id}" icon="trash">
+  Delete a church (two-stage process)
+</Card>
+
+**Required Permission:** `church.update` (Super admin only)
+
+**Deletion Process:**
+1. First DELETE: Deactivates the church (`is_active = false`)
+2. Second DELETE: Permanently removes the church and all associated data
+
+### Request
+
+<ParamField path="id" type="integer" required>
+  The ID of the church to delete
+</ParamField>
+
+```bash
+# First call - deactivates
+curl -X DELETE https://your-domain.com/api/churches/1 \
+  -H "Authorization: Bearer YOUR_TOKEN"
+
+# Second call - permanently deletes
+curl -X DELETE https://your-domain.com/api/churches/1 \
+  -H "Authorization: Bearer YOUR_TOKEN"
+```
+
+### Response (Stage 1: Deactivate)
+
+```json
+{
+  "success": true,
+  "message": "Iglesia desactivada correctamente"
+}
+```
+
+### Response (Stage 2: Hard Delete)
+
+```json
+{
+  "success": true,
+  "message": "Iglesia y todos sus datos han sido eliminados permanentemente"
+}
+```
+
+### Error Responses
+
+**Not Found (404)**
+```json
+{
+  "success": false,
+  "error": "Iglesia no encontrada"
+}
+```
+
+**Unauthorized (403)**
+```json
+{
+  "success": false,
+  "error": "No tienes permisos para borrar iglesias"
+}
+```
+
+---
+
+## Restore Church
+
+<Card title="POST /api/churches/restore" icon="rotate-left">
+  Restore a deactivated church
+</Card>
+
+**Required Permission:** `church.update`
+
+### Request Body
+
+<ParamField body="id" type="integer" required>
+  The ID of the church to restore
+</ParamField>
+
+### Request
+
+```bash
+curl -X POST https://your-domain.com/api/churches/restore \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"id": 1}'
+```
+
+### Response
+
+```json
+{
+  "success": true,
+  "message": "Iglesia restaurada correctamente"
+}
+```
+
+---
+
+## Error Codes
+
+| Code | Description |
+|------|-------------|
+| 400 | Bad Request - Invalid or missing parameters |
+| 401 | Unauthorized - Invalid or missing authentication token |
+| 403 | Forbidden - Insufficient permissions |
+| 404 | Not Found - Church doesn't exist |
+| 500 | Internal Server Error - Database or server error |
+
+---
+
+## Related APIs
+
+<CardGroup cols={2}>
+  <Card title="Areas" icon="folder" href="/api/areas">
+    Manage ministry areas within churches
+  </Card>
+  <Card title="Teams" icon="users" href="/api/teams">
+    Manage teams and groups
+  </Card>
+  <Card title="People" icon="user-group" href="/api/people">
+    Manage church members
+  </Card>
+  <Card title="Reports" icon="chart-line" href="/api/reports">
+    View church statistics and reports
+  </Card>
+</CardGroup>

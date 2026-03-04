@@ -1,0 +1,615 @@
+---
+title: 'Internationalization'
+description: 'i18next configuration for multi-language support (ES, EN, PT)'
+---
+
+# Internationalization (i18n)
+
+MinistryHub supports three languages out of the box: **Spanish (ES)**, **English (EN)**, and **Portuguese (PT)**. The internationalization system is built with **i18next** and **react-i18next**, providing automatic language detection, localStorage persistence, and easy translation management.
+
+## Technology Stack
+
+| Package | Version | Purpose |
+|---------|---------|----------|
+| **i18next** | 25.8.4 | Core i18n framework |
+| **react-i18next** | 16.5.4 | React bindings for i18next |
+| **i18next-browser-languagedetector** | 8.2.0 | Automatic language detection |
+
+## Configuration
+
+The i18n system is initialized in `frontend/src/i18n/config.ts` before the React app mounts:
+
+```tsx title="frontend/src/i18n/config.ts"
+import i18n from 'i18next';
+import { initReactI18next } from 'react-i18next';
+import LanguageDetector from 'i18next-browser-languagedetector';
+
+import es from './locales/es.json';
+import en from './locales/en.json';
+import pt from './locales/pt.json';
+
+i18n
+  .use(LanguageDetector)
+  .use(initReactI18next)
+  .init({
+    resources: {
+      es: { translation: es },
+      en: { translation: en },
+      'pt-BR': { translation: pt },
+      pt: { translation: pt } // Fallback for pt
+    },
+    fallbackLng: 'es',
+    interpolation: {
+      escapeValue: false // React already escapes XSS
+    },
+    detection: {
+      order: ['localStorage', 'navigator'],
+      caches: ['localStorage']
+    }
+  });
+
+export default i18n;
+```
+
+### Configuration Breakdown
+
+**1. Language Detection Order:**
+```ts
+detection: {
+  order: ['localStorage', 'navigator'],
+  caches: ['localStorage']
+}
+```
+- First checks `localStorage` for a previously selected language
+- Falls back to browser's `navigator.language`
+- Persists the detected language to `localStorage` for future visits
+
+**2. Fallback Language:**
+```ts
+fallbackLng: 'es'
+```
+- Spanish is the default language if detection fails
+- Missing translations in other languages fall back to Spanish
+
+**3. XSS Protection:**
+```ts
+interpolation: {
+  escapeValue: false
+}
+```
+- Disabled because React already sanitizes rendered content
+- Enables using HTML entities in translations without double-escaping
+
+<Warning>
+  Only set `escapeValue: false` when using React. For vanilla JavaScript, keep it `true` to prevent XSS attacks.
+</Warning>
+
+## Translation Files
+
+Translations are stored as JSON files in `frontend/src/i18n/locales/`:
+
+```text
+i18n/
+└── locales/
+    ├── es.json    # Spanish (default)
+    ├── en.json    # English
+    └── pt.json    # Portuguese
+```
+
+### Translation File Structure
+
+Each language file follows a nested namespace structure:
+
+```json title="frontend/src/i18n/locales/en.json (excerpt)"
+{
+  "common": {
+    "loading": "Loading...",
+    "error": "An error occurred",
+    "save": "Save",
+    "cancel": "Cancel",
+    "back": "Back",
+    "ministryHub": "Ministry Hub",
+    "smHub": "SM Hub",
+    "churchCenter": "Church Center"
+  },
+  "worship": {
+    "welcome": "Welcome to the worship center."
+  },
+  "nav": {
+    "home": "Home",
+    "dashboard": "Dashboard",
+    "people": "People",
+    "songs": "Songs",
+    "playlists": "Setlists"
+  },
+  "people": {
+    "title": "People",
+    "search": "Search people...",
+    "invite": "Invite",
+    "roles": {
+      "master": "Master",
+      "pastor": "Pastor",
+      "leader": "Leader",
+      "member": "Member"
+    }
+  },
+  "songs": {
+    "title": "Songs",
+    "search": "Search songs...",
+    "key": "Key",
+    "transpose": "Transpose",
+    "moderation": {
+      "title": "Change Moderation",
+      "approve": "Approve Changes",
+      "reject": "Reject"
+    }
+  },
+  "auth": {
+    "email": "Email Address",
+    "password": "Password",
+    "signInTitle": "Church Center",
+    "signInSubtitle": "Sign in to continue"
+  }
+}
+```
+
+### Namespace Organization
+
+| Namespace | Purpose | Example Keys |
+|-----------|---------|-------------|
+| `common` | Shared UI elements | `loading`, `save`, `cancel` |
+| `nav` | Navigation labels | `home`, `dashboard`, `songs` |
+| `auth` | Authentication flows | `email`, `password`, `signInTitle` |
+| `people` | People management | `title`, `search`, `roles.*` |
+| `songs` | Song management | `title`, `key`, `transpose` |
+| `worship` | Worship module | `welcome`, `dashboard.*` |
+| `dashboard` | Dashboard content | `welcome`, `quickActions` |
+| `profile` | User profile | `title`, `edit`, `logout` |
+
+<Tip>
+  Use nested namespaces to avoid key collisions and improve organization. For example, `people.roles.master` instead of `peopleMaster`.
+</Tip>
+
+## Usage in Components
+
+### Basic Translation Hook
+
+The `useTranslation` hook provides access to the translation function:
+
+```tsx
+import { useTranslation } from 'react-i18next';
+
+const MyComponent = () => {
+  const { t } = useTranslation();
+  
+  return (
+    <div>
+      <h1>{t('songs.title')}</h1>
+      <button>{t('common.save')}</button>
+    </div>
+  );
+};
+```
+
+### Interpolation (Variables)
+
+Pass dynamic values into translations:
+
+```tsx
+const WelcomeMessage = () => {
+  const { t } = useTranslation();
+  const userName = "John";
+  
+  return <h1>{t('dashboard.welcome', { name: userName })}</h1>;
+};
+```
+
+**Translation file:**
+```json
+{
+  "dashboard": {
+    "welcome": "Welcome, {{name}}!"
+  }
+}
+```
+
+**Output:** "Welcome, John!"
+
+### Pluralization
+
+Handle singular/plural forms automatically:
+
+```tsx
+const SongCount = ({ count }: { count: number }) => {
+  const { t } = useTranslation();
+  
+  return <p>{t('songs.count', { count })}</p>;
+};
+```
+
+**Translation file:**
+```json
+{
+  "songs": {
+    "count_one": "{{count}} song",
+    "count_other": "{{count}} songs"
+  }
+}
+```
+
+- `count = 1` → "1 song"
+- `count = 5` → "5 songs"
+
+### Language Switching
+
+Change the active language programmatically:
+
+```tsx
+import { useTranslation } from 'react-i18next';
+
+const LanguageSwitcher = () => {
+  const { i18n } = useTranslation();
+  
+  const changeLanguage = (lng: string) => {
+    i18n.changeLanguage(lng);
+  };
+  
+  return (
+    <div>
+      <button onClick={() => changeLanguage('es')}>Español</button>
+      <button onClick={() => changeLanguage('en')}>English</button>
+      <button onClick={() => changeLanguage('pt')}>Português</button>
+    </div>
+  );
+};
+```
+
+### Current Language
+
+Access the current language code:
+
+```tsx
+const { i18n } = useTranslation();
+console.log(i18n.language); // "en", "es", or "pt"
+```
+
+## Integration with Context Providers
+
+### Theme Context Integration
+
+The `ThemeProvider` syncs language changes with user preferences:
+
+```tsx title="frontend/src/context/ThemeContext.tsx:30-33"
+useEffect(() => {
+  if (user?.defaultLanguage) {
+    i18n.changeLanguage(user.defaultLanguage);
+  }
+}, [user]);
+```
+
+When a user logs in, their saved language preference is automatically applied.
+
+### Saving Language Preferences
+
+Language preferences are persisted to the backend:
+
+```tsx title="frontend/src/context/ThemeContext.tsx (example)"
+const setLanguage = async (newLang: string) => {
+  await i18n.changeLanguage(newLang);
+  if (user) {
+    await AuthService.updateSettings(theme, newLang);
+  }
+};
+```
+
+<Note>
+  Language changes are saved to both `localStorage` (for persistence) and the backend (for cross-device sync).
+</Note>
+
+## Real-World Examples
+
+### Example 1: Login Form
+
+```tsx title="frontend/src/pages/Login.tsx (excerpt)"
+import { useTranslation } from 'react-i18next';
+
+const Login = () => {
+  const { t } = useTranslation();
+  
+  return (
+    <form>
+      <h1>{t('auth.signInTitle')}</h1>
+      <p>{t('auth.signInSubtitle')}</p>
+      
+      <input 
+        type="email" 
+        placeholder={t('auth.emailPlaceholder')} 
+      />
+      <input 
+        type="password" 
+        placeholder={t('auth.password')} 
+      />
+      
+      <button type="submit">
+        {isLoading ? t('auth.signingIn') : t('auth.signInAction')}
+      </button>
+      
+      <a href="/guides/getting-started">{t('auth.forgotPassword')}</a>
+    </form>
+  );
+};
+```
+
+### Example 2: Navigation Menu
+
+```tsx title="frontend/src/components/layout/DesktopSidebar.tsx (excerpt)"
+import { useTranslation } from 'react-i18next';
+import { Link } from 'react-router-dom';
+
+const DesktopSidebar = () => {
+  const { t } = useTranslation();
+  
+  return (
+    <nav>
+      <Link to="/dashboard">{t('nav.dashboard')}</Link>
+      <Link to="/worship/songs">{t('nav.songs')}</Link>
+      <Link to="/mainhub/people">{t('nav.people')}</Link>
+      <Link to="/mainhub/teams">{t('nav.teams')}</Link>
+    </nav>
+  );
+};
+```
+
+### Example 3: Dynamic Content with Variables
+
+```tsx
+const ActivityItem = ({ user, action, title }: ActivityProps) => {
+  const { t } = useTranslation();
+  
+  return (
+    <div>
+      {t('dashboard.activity.actions.song_create', { 
+        user: user.name, 
+        title 
+      })}
+    </div>
+  );
+};
+```
+
+**Translation:**
+```json
+{
+  "dashboard": {
+    "activity": {
+      "actions": {
+        "song_create": "{{user}} created a song: {{title}}"
+      }
+    }
+  }
+}
+```
+
+**Output:** "John Doe created a song: Amazing Grace"
+
+## Adding New Translations
+
+### Step 1: Add the Key to All Language Files
+
+Add the new key to `es.json`, `en.json`, and `pt.json`:
+
+```json title="locales/es.json"
+{
+  "notifications": {
+    "title": "Notificaciones",
+    "markAsRead": "Marcar como leída"
+  }
+}
+```
+
+```json title="locales/en.json"
+{
+  "notifications": {
+    "title": "Notifications",
+    "markAsRead": "Mark as read"
+  }
+}
+```
+
+```json title="locales/pt.json"
+{
+  "notifications": {
+    "title": "Notificações",
+    "markAsRead": "Marcar como lida"
+  }
+}
+```
+
+### Step 2: Use in Components
+
+```tsx
+import { useTranslation } from 'react-i18next';
+
+const NotificationCenter = () => {
+  const { t } = useTranslation();
+  
+  return (
+    <div>
+      <h2>{t('notifications.title')}</h2>
+      <button>{t('notifications.markAsRead')}</button>
+    </div>
+  );
+};
+```
+
+### Step 3: Verify Fallback Behavior
+
+If a key is missing from a language file, i18next will:
+1. Try the fallback language (Spanish)
+2. Display the key itself if not found: `notifications.markAsRead`
+
+<Warning>
+  Always add new keys to **all** language files, even if you use placeholder text. This prevents the app from displaying raw key names.
+</Warning>
+
+## Best Practices
+
+### 1. Use Semantic Keys
+
+```tsx
+// Good - describes context and purpose
+t('people.roles.master')
+t('songs.moderation.approve')
+
+// Bad - vague and hard to maintain
+t('text1')
+t('button2')
+```
+
+### 2. Keep Translations DRY
+
+Reuse common translations from the `common` namespace:
+
+```tsx
+// Good - reuses common.save
+<button>{t('common.save')}</button>
+<button>{t('common.cancel')}</button>
+
+// Bad - duplicates translations across modules
+t('songs.save')
+t('people.save')
+t('profile.save')
+```
+
+### 3. Handle Missing Translations Gracefully
+
+Provide default values for optional translations:
+
+```tsx
+const description = t('songs.description', { defaultValue: 'No description available' });
+```
+
+### 4. Use Interpolation for Dynamic Content
+
+```tsx
+// Good - flexible and translatable
+t('people.deleteConfirm', { name: user.name })
+// "Are you sure you want to delete {{name}}?"
+
+// Bad - hardcoded and not translatable
+`Are you sure you want to delete ${user.name}?`
+```
+
+### 5. Keep HTML Out of Translations
+
+Avoid embedding HTML in translation strings:
+
+```tsx
+// Bad
+{
+  "message": "Click <a href='/help'>here</a> for help"
+}
+
+// Good - compose in component
+const message = (
+  <>
+    {t('help.message')} 
+    <Link to="/help">{t('help.link')}</Link>
+  </>
+);
+```
+
+## Testing Translations
+
+### Development Language Switcher
+
+Add a temporary language switcher during development:
+
+```tsx
+import { useTranslation } from 'react-i18next';
+
+const DevLanguageSwitcher = () => {
+  const { i18n } = useTranslation();
+  
+  if (process.env.NODE_ENV !== 'development') return null;
+  
+  return (
+    <div style={{ position: 'fixed', bottom: 10, right: 10 }}>
+      {['es', 'en', 'pt'].map(lng => (
+        <button 
+          key={lng} 
+          onClick={() => i18n.changeLanguage(lng)}
+          style={{ 
+            fontWeight: i18n.language === lng ? 'bold' : 'normal' 
+          }}
+        >
+          {lng.toUpperCase()}
+        </button>
+      ))}
+    </div>
+  );
+};
+```
+
+### Validating Translation Coverage
+
+Check for missing translations across files:
+
+```bash
+# Count keys in each file
+grep -o '"[^"]*":' locales/es.json | wc -l
+grep -o '"[^"]*":' locales/en.json | wc -l
+grep -o '"[^"]*":' locales/pt.json | wc -l
+```
+
+All three files should have the same number of keys.
+
+## Remote Translation Updates
+
+For production environments, you can load translations from a remote server:
+
+```ts
+import i18n from 'i18next';
+import Backend from 'i18next-http-backend';
+
+i18n
+  .use(Backend)
+  .use(initReactI18next)
+  .init({
+    backend: {
+      loadPath: 'https://api.ministryhub.com/locales/{{lng}}/{{ns}}.json'
+    },
+    // ... other config
+  });
+```
+
+This allows updating translations without redeploying the app.
+
+## Supported Languages
+
+| Language | Code | Locale | Status |
+|----------|------|--------|--------|
+| Spanish | `es` | es-ES | ✅ Complete |
+| English | `en` | en-US | ✅ Complete |
+| Portuguese | `pt` | pt-BR | ✅ Complete |
+
+<Note>
+  Both `pt` and `pt-BR` resolve to the same Portuguese translation file.
+</Note>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="React Structure" icon="react" href="/technical/react-structure">
+    Learn about the overall React architecture
+  </Card>
+  <Card title="Context Providers" icon="circle-nodes" href="/technical/context-providers">
+    Understand how ThemeContext syncs language preferences
+  </Card>
+  <Card title="Routing" icon="route" href="/technical/routing">
+    See how translations are used in navigation components
+  </Card>
+  <Card title="API Integration" icon="plug" href="/api/authentication">
+    How language preferences are saved to the backend
+  </Card>
+</CardGroup>

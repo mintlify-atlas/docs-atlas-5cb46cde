@@ -1,0 +1,283 @@
+---
+title: Worship Module
+description: Manage your song library, create setlists, and coordinate worship teams with ChordPro support and dynamic transposition
+icon: music
+---
+
+The Worship Module (Ministry Hub) provides comprehensive tools for worship leaders, musicians, and teams to organize songs, plan services, and collaborate on musical content.
+
+## Song Library
+
+Your church's song library serves as the central repository for all worship music, complete with lyrics, chords, and metadata.
+
+### ChordPro Format Support
+
+MinistryHub uses the industry-standard ChordPro format for song notation, enabling:
+
+- **Chord Placement**: Precise chord positioning above lyrics
+- **Sections**: Clearly defined verses, choruses, bridges, and tags
+- **Directives**: Special instructions like tempo, key, and timing markers
+- **Metadata**: Artist, CCLI number, copyright, and more
+
+<CodeGroup>
+```chordpro Example Song
+{title: Reckless Love}
+{artist: Cory Asbury}
+{key: C}
+{tempo: 118}
+
+[Verse 1]
+[C]Before I spoke a word, You were singing over [Am]me
+You have been so, so [F]good to me
+[C]Before I took a breath, You breathed Your life in [Am]me
+You have been so, so [F]kind to me
+
+[Chorus]
+Oh, the overwhelming, never-ending, [Am]reckless
+Love of [F]God
+Oh, it [C]chases me down, fights 'til I'm [Am]found
+Leaves the ninety-[F]nine
+```
+</CodeGroup>
+
+### Dynamic Transposition
+
+Transpose any song to match your vocalists' range with real-time chord conversion:
+
+- Use the **+/- controls** to shift keys up or down by semitone
+- View the resulting key instantly (e.g., C → D → E)
+- All chords update automatically throughout the song
+- Original key is preserved in the database
+
+<Tip>
+When transposing, the system maintains chord relationships. For example, transposing from C to D changes Am to Bm, F to G, maintaining the harmonic structure.
+</Tip>
+
+### Chord Notation Modes
+
+View chords in multiple notation systems to accommodate different musical backgrounds:
+
+<Tabs>
+  <Tab title="American">
+    Standard letter notation: C, D, E, F, G, A, B
+    Most common in contemporary worship settings
+  </Tab>
+  
+  <Tab title="Spanish (Latin)">
+    Do, Re, Mi, Fa, Sol, La, Si
+    Preferred in Latin American and Spanish-speaking churches
+  </Tab>
+  
+  <Tab title="Roman Numerals">
+    I, II, III, IV, V, VI, VII
+    Useful for understanding chord progressions and theory
+  </Tab>
+  
+  <Tab title="Lyrics Only">
+    Hide all chords to display clean lyrics
+    Perfect for vocalists or projection screens
+  </Tab>
+</Tabs>
+
+Switch between notation modes instantly without changing the underlying song data.
+
+## Song Management
+
+### Adding New Songs
+
+Users with the `songs.create` permission can add songs to the library:
+
+1. Navigate to **Worship → Songs** and click **Add Song**
+2. Enter basic information:
+   - Title and artist
+   - Original key (e.g., C, D, Eb)
+   - Tempo (BPM) and type (Fast/Slow)
+3. Paste or type the song content in ChordPro format
+4. Add optional metadata like CCLI number or copyright
+5. Save the song to publish it to your church's library
+
+<Info>
+For Master users, songs are added to the global library and become available to all churches. Regular users create church-specific entries.
+</Info>
+
+### Searching and Filtering
+
+Find songs quickly using the powerful search and filter tools:
+
+**Text Search**  
+Search by song title or artist name. Results update as you type.
+
+**Filter by Key**  
+Show only songs in a specific key (C, D, G, etc.) to match your service planning.
+
+**Filter by Type**  
+Separate fast songs (upbeat, energetic) from slow songs (intimate, reflective) for service flow planning.
+
+**Filter by Singer**  
+See songs assigned to specific vocalists with their preferred keys. This helps you plan setlists around available singers.
+
+### Singer Key Assignments
+
+Assign preferred keys to individual singers for each song in the library:
+
+- Each singer can have their own optimal key for any song
+- When filtering by singer, the list shows only songs they're assigned to
+- Keys are displayed next to the singer's name
+- Helps worship leaders quickly plan setlists based on available vocalists
+
+<Note>
+Singer assignments don't change the song's original key in the library—they're personalized references for planning purposes.
+</Note>
+
+## Setlists (Playlists)
+
+Setlists organize songs for specific services or events.
+
+### Creating a Setlist
+
+1. Go to **Worship → Playlists** and click **Create Playlist**
+2. Name your setlist (e.g., "Sunday Morning - March 10")
+3. Add songs from your library by searching or browsing
+4. Specify the key for each song in the setlist
+5. Reorder songs by dragging to create the perfect flow
+
+### Special Markers
+
+Tag setlists with special indicators:
+
+- **Santa Cena (Communion)**: Mark setlists that include communion songs
+- Additional service markers can be configured per church needs
+
+These visual markers help team members quickly identify the nature of each service.
+
+### Sharing with Teams
+
+Once a setlist is finalized:
+
+- Assign it to specific worship team members
+- Link it to a calendar meeting for automatic notifications
+- Team members receive access to view all songs in their assigned key
+- Musicians can prepare in advance with full chord charts
+
+## Collaboration & Moderation
+
+MinistryHub includes a moderation workflow to maintain song quality while enabling team collaboration.
+
+### Proposing Edits
+
+Collaborators and members can suggest improvements to existing songs:
+
+- Edit lyrics, chords, or structure
+- Suggest tempo or key changes
+- Fix typos or formatting issues
+
+Proposed edits enter a **pending approval** queue rather than immediately changing the live song.
+
+### Approval Workflow
+
+Worship leaders and administrators with `songs.approve` permission review pending changes:
+
+1. View the **Pending Approvals** page under Worship
+2. See side-by-side comparison of current vs. proposed content
+3. Review proposed key, tempo, or structural changes
+4. Either **approve** the edit (it goes live) or **reject** with feedback
+
+<CardGroup cols={2}>
+  <Card title="Current Version" icon="file">
+    The existing song as it appears in the library. This remains unchanged until an edit is approved.
+  </Card>
+  
+  <Card title="Proposed Version" icon="file-pen">
+    The suggested changes from the contributor. Differences are highlighted for easy review.
+  </Card>
+</CardGroup>
+
+### Why Moderation Matters
+
+This workflow ensures:
+
+- **Accuracy**: Multiple eyes review changes before they go live
+- **Theological Consistency**: Leaders can verify lyric changes align with church values
+- **Quality Control**: Prevent accidental errors or formatting issues
+- **Team Empowerment**: Anyone can contribute while maintaining oversight
+
+<Warning>
+Rejecting an edit with constructive feedback helps contributors improve future submissions. Use the rejection notes field to explain your reasoning.
+</Warning>
+
+## Instruments and Assignments
+
+Track which instruments are needed for each service and who plays them:
+
+- Maintain a list of available instruments (guitar, bass, keys, drums, etc.)
+- Assign musicians to specific instruments for each meeting
+- View instrument assignments in the calendar and setlist views
+- Ensure you have coverage for all necessary parts
+
+This helps worship leaders quickly see if they have a complete band for upcoming services.
+
+## Quick Preview Panel
+
+When browsing the song library, click any song to open the quick preview panel:
+
+- **View Chords**: See the full song without leaving the library page
+- **Transpose on the Fly**: Test different keys instantly
+- **Change Notation**: Switch between American, Spanish, or Roman numeral display
+- **Adjust Font Size**: Make lyrics larger or smaller for comfortable reading
+- **Open Full View**: Click the expand icon to open the song detail page
+
+This streamlined workflow lets you preview multiple songs quickly when planning services.
+
+## View Modes and Display Options
+
+### Font Size Control
+
+Adjust text size for different scenarios:
+
+- **Smaller fonts** for printing condensed chord sheets
+- **Larger fonts** for stage displays or musicians with vision needs
+- Settings persist per user across sessions
+
+### Responsive Layout
+
+**Mobile View**  
+Card-based layout with essential information. Tap any song to view full details.
+
+**Desktop View**  
+Table layout showing title, artist, key, tempo, and BPM at a glance. Quick preview panel appears on the right.
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Maintain Consistent Keys">
+    When adding songs, use the most common recording key as the "original key." This gives team members a reference point even if you transpose for services.
+  </Accordion>
+  
+  <Accordion title="Tag Songs by Type">
+    Mark songs as "Fast" or "Slow" to help with service flow planning. Alternating tempo creates natural dynamics in worship.
+  </Accordion>
+  
+  <Accordion title="Use Singer Assignments">
+    Assign keys to regular vocalists so you can quickly filter and see what songs work with available singers each week.
+  </Accordion>
+  
+  <Accordion title="Review Edits Promptly">
+    Check the pending approvals page regularly. Quick feedback encourages team collaboration and keeps the library current.
+  </Accordion>
+  
+  <Accordion title="Plan Ahead">
+    Create setlists at least a week in advance and assign them to meetings. This gives musicians time to practice and prepare.
+  </Accordion>
+</AccordionGroup>
+
+## Internationalization
+
+The Worship Module supports multiple languages:
+
+- Interface available in **Spanish, English, and Portuguese**
+- Songs can be added in any language
+- Future enhancement: Multiple language versions of the same song
+
+<Note>
+Currently, songs are stored and displayed exactly as entered. Automatic translation is not applied—multilingual churches can add separate entries for different language versions.
+</Note>

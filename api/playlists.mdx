@@ -1,0 +1,399 @@
+---
+title: 'Playlists API'
+description: 'Create and manage song playlists for worship services'
+---
+
+## Overview
+
+Playlists organize songs for worship services, rehearsals, and special events. Each playlist belongs to a church and optionally to a specific team. Access control ensures members only see playlists relevant to their teams.
+
+## Authentication
+
+All endpoints require authentication:
+
+- **Read**: `calendar.read` (playlists are part of the calendar/scheduling system)
+- **Create**: Requires `pastor`, `leader`, or `coordinator` role
+
+```bash
+Authorization: Bearer YOUR_JWT_TOKEN
+```
+
+---
+
+## List Playlists
+
+<Card title="GET /api/playlists" icon="list">
+  Retrieve playlists for a church
+</Card>
+
+**Required Permission:** `calendar.read`
+
+### Query Parameters
+
+<ParamField query="church_id" type="integer">
+  Filter playlists by church ID. Defaults to authenticated user's church.
+</ParamField>
+
+<ParamField query="churchId" type="integer">
+  Alternative parameter for church_id
+</ParamField>
+
+<ParamField query="group_id" type="integer">
+  Filter playlists by team/group ID
+</ParamField>
+
+<ParamField query="groupId" type="integer">
+  Alternative parameter for group_id
+</ParamField>
+
+### Access Control
+
+- **Pastors, Leaders, Coordinators**: See all playlists for their church
+- **Regular Members**: Only see playlists for teams they belong to
+- **Super Admins**: See all playlists across all churches
+
+### Request
+
+```bash
+# All playlists for a church
+curl -X GET "https://your-domain.com/api/playlists?church_id=1" \
+  -H "Authorization: Bearer YOUR_TOKEN"
+
+# Playlists for a specific team
+curl -X GET "https://your-domain.com/api/playlists?church_id=1&group_id=3" \
+  -H "Authorization: Bearer YOUR_TOKEN"
+```
+
+### Response
+
+<ResponseField name="success" type="boolean">
+  Indicates if the request was successful
+</ResponseField>
+
+<ResponseField name="playlists" type="array">
+  Array of playlist objects
+</ResponseField>
+
+```json
+{
+  "success": true,
+  "playlists": [
+    {
+      "id": 1,
+      "church_id": 1,
+      "group_id": 3,
+      "name": "Sunday Service - March 17",
+      "description": "Morning worship service playlist",
+      "created_by_member_id": 5,
+      "created_by_name": "John Smith",
+      "song_count": 6,
+      "created_at": "2024-03-10 14:30:00"
+    },
+    {
+      "id": 2,
+      "church_id": 1,
+      "group_id": null,
+      "name": "Easter Sunday Set",
+      "description": "Special Easter service songs",
+      "created_by_member_id": 5,
+      "created_by_name": "John Smith",
+      "song_count": 8,
+      "created_at": "2024-03-01 10:15:00"
+    }
+  ]
+}
+```
+
+---
+
+## Get Playlist Details
+
+<Card title="GET /api/playlists/{id}" icon="list-music">
+  Retrieve detailed playlist information including all songs
+</Card>
+
+**Required Permission:** `calendar.read`
+
+### Request Parameters
+
+<ParamField path="id" type="integer" required>
+  The unique identifier of the playlist
+</ParamField>
+
+### Request
+
+```bash
+curl -X GET https://your-domain.com/api/playlists/1 \
+  -H "Authorization: Bearer YOUR_TOKEN"
+```
+
+### Response
+
+```json
+{
+  "success": true,
+  "playlist": {
+    "id": 1,
+    "church_id": 1,
+    "group_id": 3,
+    "name": "Sunday Service - March 17",
+    "description": "Morning worship service playlist",
+    "created_by_member_id": 5,
+    "created_at": "2024-03-10 14:30:00",
+    "items": [
+      {
+        "id": 15,
+        "songKey": "C",
+        "song": {
+          "id": 15,
+          "title": "Great Are You Lord",
+          "artist": "All Sons & Daughters",
+          "original_key": "C",
+          "tempo": "72 BPM",
+          "category": "Worship",
+          "content": "[Verse 1]..."          
+        }
+      },
+      {
+        "id": 22,
+        "songKey": "G",
+        "song": {
+          "id": 22,
+          "title": "10,000 Reasons",
+          "artist": "Matt Redman",
+          "original_key": "G",
+          "tempo": "73 BPM",
+          "category": "Praise"
+        }
+      }
+    ]
+  }
+}
+```
+
+### Error Response
+
+**Not Found (404)**
+```json
+{
+  "success": false,
+  "error": "Playlist not found"
+}
+```
+
+---
+
+## Create Playlist
+
+<Card title="POST /api/playlists" icon="plus">
+  Create a new playlist
+</Card>
+
+**Required Permission:** `calendar.read` + role in [`pastor`, `leader`, `coordinator`]
+
+### Request Body
+
+<ParamField body="name" type="string" required>
+  The name of the playlist
+</ParamField>
+
+<ParamField body="church_id" type="integer" required>
+  The church ID this playlist belongs to
+</ParamField>
+
+<ParamField body="churchId" type="integer">
+  Alternative parameter for church_id
+</ParamField>
+
+<ParamField body="description" type="string">
+  Optional description of the playlist
+</ParamField>
+
+<ParamField body="group_id" type="integer">
+  Team/group ID this playlist is associated with
+</ParamField>
+
+<ParamField body="groupId" type="integer">
+  Alternative parameter for group_id
+</ParamField>
+
+<ParamField body="songs" type="array">
+  Array of song IDs to add to the playlist (in order)
+</ParamField>
+
+### Request
+
+```bash
+curl -X POST https://your-domain.com/api/playlists \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Sunday Service - March 24",
+    "church_id": 1,
+    "group_id": 3,
+    "description": "Palm Sunday service",
+    "songs": [15, 22, 8, 31, 19, 42]
+  }'
+```
+
+### Response
+
+```json
+{
+  "success": true,
+  "id": 5,
+  "message": "Playlist created"
+}
+```
+
+### Process Details
+
+1. Creates the playlist record
+2. Adds songs in the specified order
+3. Logs activity in the system
+4. Returns the new playlist ID
+
+### Error Responses
+
+**Missing Required Fields (400)**
+```json
+{
+  "success": false,
+  "error": "Name and Church ID required"
+}
+```
+
+**Insufficient Permissions (403)**
+```json
+{
+  "success": false,
+  "error": "Insufficient permissions"
+}
+```
+
+---
+
+## Playlist Visibility
+
+### Team-Specific Playlists
+
+When `group_id` is set:
+- Only members of that team can see the playlist (unless they're pastors/leaders)
+- Useful for rehearsals and team-specific services
+
+### Church-Wide Playlists
+
+When `group_id` is `null`:
+- Visible to all authorized members of the church
+- Useful for main services and general planning
+
+---
+
+## Song Order
+
+Songs in a playlist maintain their order:
+
+1. The `songs` array index determines display order
+2. Songs appear in the `items` array in the same order
+3. Reordering requires updating the playlist (future endpoint)
+
+---
+
+## Activity Logging
+
+Playlist creation automatically logs an activity:
+
+```json
+{
+  "church_id": 1,
+  "member_id": 5,
+  "action": "created",
+  "entity_type": "playlist",
+  "entity_id": 5,
+  "details": {
+    "name": "Sunday Service - March 24"
+  }
+}
+```
+
+---
+
+## Role Requirements
+
+To create playlists, users must have one of these roles:
+
+- `pastor` - Senior leadership
+- `leader` - Ministry leaders
+- `coordinator` - Service coordinators
+
+<Note>
+  Regular members (`member` role) can view playlists but cannot create them.
+</Note>
+
+---
+
+## Error Codes
+
+| Code | Description |
+|------|-------------|
+| 400 | Bad Request - Missing church_id or name |
+| 401 | Unauthorized - Invalid or missing token |
+| 403 | Forbidden - Insufficient role permissions |
+| 404 | Not Found - Playlist doesn't exist |
+| 500 | Internal Server Error |
+
+---
+
+## Use Cases
+
+### Sunday Service Planning
+
+```json
+{
+  "name": "Sunday Morning - March 24",
+  "church_id": 1,
+  "group_id": 3,
+  "description": "Regular Sunday service",
+  "songs": [15, 22, 8, 31, 19]
+}
+```
+
+### Special Event
+
+```json
+{
+  "name": "Christmas Eve Service",
+  "church_id": 1,
+  "group_id": null,
+  "description": "Traditional Christmas carols",
+  "songs": [102, 105, 108, 112]
+}
+```
+
+### Team Rehearsal
+
+```json
+{
+  "name": "Worship Team Practice",
+  "church_id": 1,
+  "group_id": 3,
+  "description": "Wednesday rehearsal set",
+  "songs": [22, 31, 42]
+}
+```
+
+---
+
+## Related APIs
+
+<CardGroup cols={2}>
+  <Card title="Songs" icon="music" href="/api/songs">
+    Manage the song library
+  </Card>
+  <Card title="Calendar" icon="calendar" href="/api/calendar">
+    Schedule services and assign playlists
+  </Card>
+  <Card title="Teams" icon="users" href="/api/teams">
+    Manage worship teams
+  </Card>
+</CardGroup>

@@ -1,0 +1,446 @@
+---
+title: PHP Backend Architecture
+description: Understanding MinistryHub's custom PHP micro-framework and PSR-4 architecture
+---
+
+# PHP Backend Architecture
+
+MinistryHub uses a **custom-built, zero-dependency PHP micro-framework** that follows PSR-4 autoloading standards and modern architectural patterns. This approach delivers maximum performance while maintaining clean, maintainable code.
+
+## Philosophy: "The Right Tool for the Right Task"
+
+Rather than relying on heavyweight frameworks like Laravel or Symfony, MinistryHub implements only what's needed:
+
+- **PSR-4 Autoloading**: Automatic class loading without `require` statements
+- **Zero External Dependencies**: No Composer packages, no bloat
+- **Controller-Repository Pattern**: Clear separation between routing and data access
+- **Middleware System**: Centralized security and authentication
+- **Multi-Database Support**: Separate databases for user data and music content
+
+---
+
+## Directory Structure
+
+The backend follows a **public/private split** security model:
+
+```
+/ (Server Root)
+├── backend/                    # PRIVATE CORE (Not web-accessible)
+│   ├── config/
+│   │   └── database.env        # Database credentials & secrets
+│   ├── src/
+│   │   ├── bootstrap.php       # PSR-4 Autoloader & initialization
+│   │   ├── Database.php        # Multi-database connection manager
+│   │   ├── Jwt.php             # JWT encoding/decoding
+│   │   ├── Controllers/        # API request handlers
+│   │   ├── Repositories/       # Database query layer
+│   │   ├── Middleware/         # Authentication & permissions
+│   │   └── Helpers/            # CORS, Response, Logger utilities
+│   └── logs/                   # Application logs
+└── public_html/                # PUBLIC ACCESS ONLY
+    ├── api/
+    │   └── index.php           # Single entry point for all API calls
+    ├── assets/                 # React app static files
+    ├── .htaccess               # URL rewriting rules
+    └── index.html              # React SPA entry
+```
+
+**Security Benefit**: The `backend/` folder is placed **outside** the web root, making it impossible to access sensitive files like `database.env` via URL.
+
+---
+
+## PSR-4 Autoloading
+
+The system implements PSR-4 autoloading manually in `bootstrap.php`, eliminating the need for Composer:
+
+<CodeGroup>
+```php bootstrap.php
+<?php
+
+// Define project root
+if (!defined('APP_ROOT')) {
+    define('APP_ROOT', dirname(__DIR__));
+}
+
+// PSR-4 Autoloader
+spl_autoload_register(function ($class) {
+    $prefix = 'App\\';
+    $base_dir = __DIR__ . '/';
+
+    $len = strlen($prefix);
+    if (strncmp($prefix, $class, $len) !== 0) {
+        return;  // Not our namespace, skip
+    }
+
+    // Convert namespace to file path
+    $relative_class = substr($class, $len);
+    $file = $base_dir . str_replace('\\', '/', $relative_class) . '.php';
+
+    if (file_exists($file)) {
+        require $file;
+    }
+});
+
+// Global Exception Handler
+set_exception_handler(function ($e) {
+    $msg = "Uncaught Exception: " . $e->getMessage() . "\n" .
+        "File: " . $e->getFile() . ":" . $e->getLine();
+    \App\Helpers\Logger::error($msg);
+    \App\Helpers\Response::error("Internal server error", 500);
+});
+
+// Initialize CORS
+\App\Helpers\Cors::init();
+```
+</CodeGroup>
+
+### How PSR-4 Works
+
+1. **Namespace Mapping**: The namespace `App\` maps to `backend/src/`
+2. **Automatic Loading**: When you reference `App\Controllers\SongController`, PHP automatically looks for `backend/src/Controllers/SongController.php`
+3. **No Manual Requires**: You never need to write `require` statements
+
+**Example**:
+```php
+// This class reference...
+new \App\Controllers\AuthController();
+
+// ...automatically loads this file:
+// backend/src/Controllers/AuthController.php
+```
+
+---
+
+## Multi-Database Architecture
+
+MinistryHub uses **two separate MySQL databases**:
+
+- **Main Database**: User accounts, churches, permissions, attendance
+- **Music Database**: Songs, playlists, instruments, setlists
+
+This separation allows independent scaling and specialized optimization.
+
+### Database Connection Manager
+
+The `Database` class implements the **Singleton pattern** with multi-database support:
+
+<CodeGroup>
+```php Database.php
+<?php
+namespace App;
+
+use PDO;
+
+class Database
+{
+    private static $instances = [];
+    private static $cachedEnv = null;
+    private $conn;
+
+    private function __construct($configKey = 'main')
+    {
+        if (self::$cachedEnv === null) {
+            $configPath = APP_ROOT . '/config/database.env';
+            self::$cachedEnv = parse_ini_file($configPath);
+        }
+
+        $env = self::$cachedEnv;
+
+        // Load config based on database key
+        if ($configKey === 'main') {
+            $host = $env['DB_HOST'];
+            $user = $env['DB_USER'];
+            $pass = $env['DB_PASS'];
+            $name = $env['DB_NAME'];
+            $port = $env['DB_PORT'] ?? '3306';
+        } elseif ($configKey === 'music') {
+            $host = $env['MUSIC_DB_HOST'];
+            $user = $env['MUSIC_DB_USER'];
+            $pass = $env['MUSIC_DB_PASS'];
+            $name = $env['MUSIC_DB_NAME'];
+            $port = $env['DB_PORT'] ?? '3306';
+        }
+
+        // Create PDO connection
+        $dsn = "mysql:host=$host;port=$port;dbname=$name;charset=utf8mb4";
+        $this->conn = new PDO($dsn, $user, $pass);
+        $this->conn->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+        $this->conn->setAttribute(PDO::ATTR_DEFAULT_FETCH_MODE, PDO::FETCH_ASSOC);
+    }
+
+    public static function getInstance($configKey = 'main')
+    {
+        if (!isset(self::$instances[$configKey])) {
+            self::$instances[$configKey] = new self($configKey);
+        }
+        return self::$instances[$configKey]->conn;
+    }
+}
+```
+</CodeGroup>
+
+### Usage in Repositories
+
+```php
+// Access main database (users, churches, etc.)
+$db = Database::getInstance('main');
+
+// Access music database (songs, playlists, etc.)
+$db = Database::getInstance('music');
+```
+
+**Benefits**:
+- Single connection per database (performance)
+- Lazy loading (only connects when needed)
+- Easy to add more databases
+- Cached configuration parsing
+
+---
+
+## JWT Authentication
+
+MinistryHub implements **stateless authentication** using JSON Web Tokens:
+
+<CodeGroup>
+```php Jwt.php
+<?php
+namespace App;
+
+class Jwt
+{
+    private static $cachedSecret = null;
+
+    private static function getSecret()
+    {
+        if (self::$cachedSecret !== null) {
+            return self::$cachedSecret;
+        }
+
+        $configPath = APP_ROOT . '/config/database.env';
+        $env = parse_ini_file($configPath);
+        self::$cachedSecret = $env['JWT_SECRET'] ?? 'default_secret';
+        return self::$cachedSecret;
+    }
+
+    public static function encode($payload)
+    {
+        $header = json_encode(['typ' => 'JWT', 'alg' => 'HS256']);
+        $base64UrlHeader = self::base64UrlEncode($header);
+        $base64UrlPayload = self::base64UrlEncode(json_encode($payload));
+
+        $signature = hash_hmac('sha256', 
+            $base64UrlHeader . "." . $base64UrlPayload, 
+            self::getSecret(), 
+            true
+        );
+        $base64UrlSignature = self::base64UrlEncode($signature);
+
+        return $base64UrlHeader . "." . $base64UrlPayload . "." . $base64UrlSignature;
+    }
+
+    public static function decode($token)
+    {
+        $parts = explode('.', $token);
+        if (count($parts) !== 3) return null;
+
+        list($header, $payload, $signature) = $parts;
+        $validSignature = hash_hmac('sha256', 
+            $header . "." . $payload, 
+            self::getSecret(), 
+            true
+        );
+
+        // Verify signature
+        if (self::base64UrlEncode($validSignature) !== $signature) {
+            return null;
+        }
+
+        $decodedPayload = json_decode(self::base64UrlDecode($payload), true);
+
+        // Check expiration
+        if (isset($decodedPayload['exp']) && $decodedPayload['exp'] < time()) {
+            return null;
+        }
+
+        return $decodedPayload;
+    }
+}
+```
+</CodeGroup>
+
+### Token Lifecycle
+
+1. **Login**: User provides email/password → Server returns JWT
+2. **Storage**: Frontend stores token in `localStorage`
+3. **API Calls**: Token sent in `Authorization: Bearer <token>` header
+4. **Verification**: `AuthMiddleware` validates token on every request
+5. **Expiration**: Tokens expire after 3600 seconds (1 hour)
+
+---
+
+## Helper Classes
+
+The framework includes several utility helpers:
+
+### Response Helper
+
+```php
+namespace App\Helpers;
+
+class Response
+{
+    public static function json($data, $status = 200)
+    {
+        header('Content-Type: application/json');
+        http_response_code($status);
+        echo json_encode($data);
+        exit;
+    }
+
+    public static function error($message, $status = 400, $errorData = [])
+    {
+        self::json([
+            'success' => false,
+            'error' => $message,
+            'data' => $errorData
+        ], $status);
+    }
+}
+```
+
+### CORS Helper
+
+```php
+namespace App\Helpers;
+
+class Cors
+{
+    public static function init()
+    {
+        $origin = $_SERVER['HTTP_ORIGIN'] ?? '';
+        $allowed_origins = [
+            'http://localhost:5173',
+            'https://musicservicemanager.net'
+        ];
+
+        if (in_array($origin, $allowed_origins)) {
+            header("Access-Control-Allow-Origin: $origin");
+            header("Access-Control-Allow-Credentials: true");
+        }
+
+        header("Access-Control-Allow-Methods: GET, POST, OPTIONS, PUT, DELETE");
+        header("Access-Control-Allow-Headers: Content-Type, Authorization");
+
+        // Handle preflight requests
+        if ($_SERVER['REQUEST_METHOD'] == 'OPTIONS') {
+            http_response_code(200);
+            exit;
+        }
+    }
+}
+```
+
+---
+
+## Configuration Management
+
+All sensitive configuration is stored in `backend/config/database.env`:
+
+```ini
+# Main Database
+DB_HOST=localhost
+DB_USER=ministry_user
+DB_PASS=secure_password
+DB_NAME=ministry_main
+DB_PORT=3306
+
+# Music Database
+MUSIC_DB_HOST=localhost
+MUSIC_DB_USER=music_user
+MUSIC_DB_PASS=secure_password
+MUSIC_DB_NAME=ministry_music
+
+# Security
+JWT_SECRET=your_secret_key_here
+RECAPTCHA_SECRET_KEY=your_recaptcha_key
+
+# OAuth
+GOOGLE_CLIENT_ID=your_google_client_id
+GOOGLE_CLIENT_SECRET=your_google_client_secret
+```
+
+<Warning>
+  **Never commit `database.env` to version control.** Add it to `.gitignore` immediately.
+</Warning>
+
+---
+
+## Security Features
+
+### 1. SQL Injection Prevention
+All database queries use **PDO prepared statements**:
+
+```php
+// ✅ SAFE: Parameterized query
+$stmt = $db->prepare("SELECT * FROM users WHERE email = ?");
+$stmt->execute([$email]);
+
+// ❌ NEVER DO THIS: String concatenation
+$sql = "SELECT * FROM users WHERE email = '$email'";
+```
+
+### 2. XSS Protection
+All API responses use `Content-Type: application/json`, preventing script injection.
+
+### 3. CSRF Protection
+JWT tokens are stateless and validated on every request, eliminating session-based CSRF vulnerabilities.
+
+### 4. reCAPTCHA v3
+Login endpoint includes invisible reCAPTCHA verification:
+
+```php
+private function verifyRecaptcha($token)
+{
+    $secret = $env['RECAPTCHA_SECRET_KEY'];
+    $url = 'https://www.google.com/recaptcha/api/siteverify';
+    
+    $response = file_get_contents($url, false, stream_context_create([
+        'http' => [
+            'method' => 'POST',
+            'content' => http_build_query(['secret' => $secret, 'response' => $token])
+        ]
+    ]));
+    
+    $result = json_decode($response, true);
+    return $result['success'] && ($result['score'] ?? 0) >= 0.5;
+}
+```
+
+---
+
+## Performance Optimizations
+
+### 1. Singleton Database Connections
+Only one connection per database throughout the request lifecycle.
+
+### 2. Cached Configuration
+The `database.env` file is parsed once and cached statically.
+
+### 3. Minimal Autoloading Overhead
+PSR-4 autoloader only triggers when a class is actually used.
+
+### 4. No Framework Bloat
+Zero external dependencies means faster execution and smaller memory footprint.
+
+---
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Controllers" icon="route" href="/technical/controllers">
+    Learn how API requests are routed and handled
+  </Card>
+  <Card title="Repositories" icon="database" href="/technical/repositories">
+    Understand the data access layer and query patterns
+  </Card>
+</CardGroup>

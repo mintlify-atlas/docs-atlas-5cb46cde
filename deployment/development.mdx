@@ -1,0 +1,370 @@
+---
+title: Development Environment
+description: Set up MinistryHub for local development
+---
+
+## Prerequisites
+
+Before setting up MinistryHub locally, ensure you have the following installed:
+
+- **Node.js** 18.x or higher
+- **PHP** 8.0 or higher
+- **MySQL** 8.0 or higher
+- A local web server (Apache, Nginx, or PHP's built-in server)
+- Package manager: npm, yarn, or pnpm
+
+## Project Structure
+
+MinistryHub uses a secure architecture that separates public and private code:
+
+```text
+/ (Server Root)
+├── backend/                # PRIVATE CORE (Sibling of public_html)
+│   ├── config/             # Database credentials (.env)
+│   ├── src/                # Controllers, Repositories, Helpers
+│   └── bootstrap.php       # PSR-4 Autoloader & Initialization
+└── public_html/            # PUBLIC ACCESS
+    ├── assets/             # Compiled JS/CSS from React
+    ├── api/                # index.php (API entry point)
+    ├── .htaccess           # Routing logic
+    └── index.html          # React SPA Entry point
+```
+
+## Clone the Repository
+
+First, clone the MinistryHub repository:
+
+<CodeGroup>
+```bash npm
+git clone <repository-url>
+cd ministryhub
+```
+
+```bash yarn
+git clone <repository-url>
+cd ministryhub
+```
+
+```bash pnpm
+git clone <repository-url>
+cd ministryhub
+```
+</CodeGroup>
+
+## Database Setup
+
+MinistryHub uses two separate databases for better organization:
+
+### 1. Create Databases
+
+Create two MySQL databases:
+
+```sql
+CREATE DATABASE ministryhub_main CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+CREATE DATABASE ministryhub_music CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+```
+
+### 2. Import SQL Files
+
+Import the schema files located in your project:
+
+```bash
+mysql -u your_user -p ministryhub_main < "User SQL/main.sql"
+mysql -u your_user -p ministryhub_music < "Music SQL/music.sql"
+```
+
+### 3. Configure Database Connection
+
+Create the configuration file at `backend/config/database.env`:
+
+```ini backend/config/database.env
+# Main Database Configuration
+DB_HOST=localhost
+DB_PORT=3306
+DB_USER=your_database_user
+DB_PASS=your_database_password
+DB_NAME=ministryhub_main
+
+# Music Database Configuration
+MUSIC_DB_HOST=localhost
+MUSIC_DB_USER=your_database_user
+MUSIC_DB_PASS=your_database_password
+MUSIC_DB_NAME=ministryhub_music
+
+# JWT Secret (Change this to a secure random string)
+JWT_SECRET=your_secure_random_jwt_secret_key_here
+
+# reCAPTCHA Configuration (Optional for development)
+RECAPTCHA_SECRET=your_recaptcha_secret_key
+```
+
+<Warning>
+  Make sure to generate a strong, random `JWT_SECRET` for security. Never commit the `database.env` file to version control.
+</Warning>
+
+## Backend Setup
+
+The backend uses vanilla PHP with PSR-4 autoloading and requires no additional dependencies.
+
+### 1. Verify PHP Configuration
+
+Ensure PHP has the required extensions:
+
+```bash
+php -m | grep -E 'pdo|pdo_mysql|json'
+```
+
+### 2. Create Logs Directory
+
+Ensure the logs directory exists and is writable:
+
+```bash
+mkdir -p backend/logs
+chmod 755 backend/logs
+```
+
+### 3. Start PHP Development Server
+
+You can use PHP's built-in server for local development:
+
+```bash
+cd public_html
+php -S localhost:8000
+```
+
+<Note>
+  The `.htaccess` file handles routing for both API calls (`/api/*`) and SPA routes. All API requests are routed to `api/index.php`.
+</Note>
+
+## Frontend Setup
+
+The frontend is built with React 19, TypeScript, and Vite.
+
+### 1. Navigate to Frontend Directory
+
+```bash
+cd frontend
+```
+
+### 2. Install Dependencies
+
+<CodeGroup>
+```bash npm
+npm install
+```
+
+```bash yarn
+yarn install
+```
+
+```bash pnpm
+pnpm install
+```
+</CodeGroup>
+
+### 3. Configure Environment Variables
+
+Create a `.env` file in the `frontend` directory:
+
+```ini frontend/.env
+VITE_API_URL=/api
+```
+
+<Note>
+  The frontend uses a relative API URL (`/api`) which works seamlessly in development when both frontend and backend are served from the same origin.
+</Note>
+
+### 4. Start Development Server
+
+<CodeGroup>
+```bash npm
+npm run dev
+```
+
+```bash yarn
+yarn dev
+```
+
+```bash pnpm
+pnpm dev
+```
+</CodeGroup>
+
+The development server will start at `http://localhost:5173` by default.
+
+## Development Workflow
+
+### Hot Module Replacement
+
+Vite provides instant hot module replacement (HMR) for React components. Your changes will appear immediately without a full page reload.
+
+### API Development
+
+When making changes to the backend:
+
+1. Edit PHP files in `backend/src/`
+2. No build step required - changes are reflected immediately
+3. Check `backend/logs/` for error logs if needed
+
+### Frontend Development
+
+When working on the React frontend:
+
+1. Edit files in `frontend/src/`
+2. Vite automatically recompiles and hot-reloads
+3. Use the browser console for debugging
+
+### Request Lifecycle
+
+Understanding how requests flow through the system:
+
+1. **Client Request**: Browser visits `localhost:5173/worship/songs`
+2. **`.htaccess` Intervention**:
+   - If it's an `/api/*` call → routes to `api/index.php`
+   - If it's a page route → serves `index.html` (React Router takes over)
+3. **API Handling**: `api/index.php` extracts JWT, identifies user, routes to Controller
+4. **Data Layer**: Controller asks Repository for data using PDO
+
+## Development Tools
+
+### DevProfileSelector
+
+In development mode, MinistryHub includes a profile selector for testing:
+
+```tsx
+{import.meta.env.DEV && <DevProfileSelector />}
+```
+
+This component only appears when `import.meta.env.DEV` is `true`.
+
+### TypeScript
+
+Run TypeScript type checking:
+
+<CodeGroup>
+```bash npm
+npm run build
+```
+
+```bash yarn
+yarn build
+```
+
+```bash pnpm
+pnpm build
+```
+</CodeGroup>
+
+### Linting
+
+Run ESLint to check code quality:
+
+<CodeGroup>
+```bash npm
+npm run lint
+```
+
+```bash yarn
+yarn lint
+```
+
+```bash pnpm
+pnpm lint
+```
+</CodeGroup>
+
+## Troubleshooting
+
+### Database Connection Issues
+
+<AccordionGroup>
+  <Accordion title="Error: Database configuration missing">
+    Ensure `backend/config/database.env` exists and contains all required variables:
+    - `DB_HOST`, `DB_USER`, `DB_PASS`, `DB_NAME`
+    - `MUSIC_DB_HOST`, `MUSIC_DB_USER`, `MUSIC_DB_PASS`, `MUSIC_DB_NAME`
+  </Accordion>
+
+  <Accordion title="PDO Connection Failed">
+    Verify your MySQL service is running:
+    ```bash
+    # macOS
+    brew services list
+    
+    # Linux
+    sudo systemctl status mysql
+    
+    # Windows
+    net start MySQL80
+    ```
+  </Accordion>
+
+  <Accordion title="Character Set Issues">
+    Ensure your databases use UTF-8:
+    ```sql
+    ALTER DATABASE ministryhub_main CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+    ALTER DATABASE ministryhub_music CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+    ```
+  </Accordion>
+</AccordionGroup>
+
+### Frontend Issues
+
+<AccordionGroup>
+  <Accordion title="API Requests Failing (CORS)">
+    If you're running frontend and backend on different ports, you may encounter CORS issues. The backend initializes CORS in `backend/src/bootstrap.php`:
+    ```php
+    \App\Helpers\Cors::init();
+    ```
+    
+    Check your CORS configuration in the Cors helper.
+  </Accordion>
+
+  <Accordion title="Vite Build Errors">
+    Clear Vite cache and reinstall dependencies:
+    ```bash
+    rm -rf node_modules .vite
+    npm install
+    ```
+  </Accordion>
+
+  <Accordion title="TypeScript Errors">
+    Run type checking to see detailed errors:
+    ```bash
+    npx tsc --noEmit
+    ```
+  </Accordion>
+</AccordionGroup>
+
+### PHP Issues
+
+<AccordionGroup>
+  <Accordion title="Authorization Header Not Visible">
+    The `.htaccess` file ensures the Authorization header is passed to PHP:
+    ```apache
+    RewriteCond %{HTTP:Authorization} ^(.*)
+    RewriteRule .* - [e=HTTP_AUTHORIZATION:%1]
+    ```
+    
+    If this doesn't work, check your Apache configuration.
+  </Accordion>
+
+  <Accordion title="404 on API Routes">
+    Ensure `mod_rewrite` is enabled in Apache:
+    ```bash
+    # Enable mod_rewrite
+    sudo a2enmod rewrite
+    sudo systemctl restart apache2
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Configuration" icon="gear" href="/deployment/configuration">
+    Learn about advanced configuration options
+  </Card>
+  <Card title="Production" icon="rocket" href="/deployment/production">
+    Deploy MinistryHub to production
+  </Card>
+</CardGroup>

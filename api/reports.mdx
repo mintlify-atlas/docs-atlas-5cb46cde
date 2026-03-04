@@ -1,0 +1,380 @@
+---
+title: 'Reports API'
+description: 'Access church statistics and dashboard analytics'
+---
+
+## Overview
+
+The Reports API provides statistical insights and analytics for church operations. It includes general dashboard stats, pastor-specific metrics, and system status monitoring.
+
+## Authentication
+
+All endpoints require authentication with the `church.read` permission:
+
+```bash
+Authorization: Bearer YOUR_JWT_TOKEN
+```
+
+---
+
+## Get Dashboard Stats
+
+<Card title="GET /api/reports" icon="chart-line">
+  Retrieve comprehensive dashboard statistics for a church or globally
+</Card>
+
+**Required Permission:** `church.read`
+
+### Query Parameters
+
+<ParamField query="church_id" type="integer">
+  Filter stats by church ID. Required for non-super admins.
+</ParamField>
+
+<ParamField query="churchId" type="integer">
+  Alternative parameter for church_id
+</ParamField>
+
+### Access Levels
+
+- **Church Members**: Must provide church_id, see stats for their church only
+- **Super Admins**: Can omit church_id to see global stats across all churches
+
+### Request (Church-Specific)
+
+```bash
+curl -X GET "https://your-domain.com/api/reports?church_id=1" \
+  -H "Authorization: Bearer YOUR_TOKEN"
+```
+
+### Response (Church-Specific)
+
+```json
+{
+  "success": true,
+  "db_status": {
+    "main": "online",
+    "music": "online"
+  },
+  "data": {
+    "total_members": 245,
+    "active_members": 198,
+    "pending_members": 12,
+    "inactive_members": 35,
+    "total_teams": 18,
+    "total_areas": 6,
+    "total_songs": 342,
+    "church_songs": 28,
+    "global_songs": 314,
+    "total_playlists": 15,
+    "upcoming_meetings": 8,
+    "recent_activities": 47,
+    "member_growth_30d": 12,
+    "member_growth_percentage": 5.1
+  }
+}
+```
+
+### Request (Global - Super Admin Only)
+
+```bash
+curl -X GET https://your-domain.com/api/reports \
+  -H "Authorization: Bearer YOUR_TOKEN"
+```
+
+### Response (Global Stats)
+
+```json
+{
+  "success": true,
+  "db_status": {
+    "main": "online",
+    "music": "online"
+  },
+  "data": {
+    "total_churches": 12,
+    "active_churches": 11,
+    "total_members_all_churches": 2847,
+    "total_teams_all_churches": 186,
+    "total_songs_global": 425,
+    "total_playlists_all_churches": 142,
+    "system_uptime": "99.8%",
+    "storage_used_gb": 12.4,
+    "churches": [
+      {
+        "id": 1,
+        "name": "First Baptist Church",
+        "member_count": 245,
+        "active_teams": 18
+      },
+      {
+        "id": 2,
+        "name": "Grace Community Church",
+        "member_count": 312,
+        "active_teams": 22
+      }
+    ]
+  }
+}
+```
+
+### Database Status
+
+<ResponseField name="db_status.main" type="string">
+  Status of main database: "online" or "error"
+</ResponseField>
+
+<ResponseField name="db_status.music" type="string">
+  Status of music database: "online" or "error"
+</ResponseField>
+
+---
+
+## Get Pastor Stats
+
+<Card title="GET /api/reports/pastor_stats" icon="user-tie">
+  Retrieve leadership-focused statistics and insights
+</Card>
+
+**Required Permission:** `church.read`
+
+**Use Case:** Designed for pastors and church leaders to get high-level ministry insights.
+
+### Query Parameters
+
+<ParamField query="church_id" type="integer">
+  Church ID to get stats for. Required for non-super admins.
+</ParamField>
+
+<ParamField query="churchId" type="integer">
+  Alternative parameter for church_id
+</ParamField>
+
+### Request
+
+```bash
+curl -X GET "https://your-domain.com/api/reports/pastor_stats?church_id=1" \
+  -H "Authorization: Bearer YOUR_TOKEN"
+```
+
+### Response
+
+```json
+{
+  "success": true,
+  "stats": {
+    "overview": {
+      "total_members": 245,
+      "active_members": 198,
+      "member_retention_rate": 80.8,
+      "new_members_30d": 12,
+      "new_members_90d": 28
+    },
+    "engagement": {
+      "total_teams": 18,
+      "members_in_teams": 145,
+      "engagement_rate": 73.2,
+      "average_team_size": 8.1,
+      "teams_by_area": [
+        {
+          "area_name": "Worship Ministry",
+          "team_count": 4,
+          "member_count": 32
+        },
+        {
+          "area_name": "Youth Ministry",
+          "team_count": 3,
+          "member_count": 28
+        }
+      ]
+    },
+    "ministry": {
+      "total_areas": 6,
+      "upcoming_events": 8,
+      "events_this_month": 15,
+      "worship_songs_library": 342,
+      "active_playlists": 15
+    },
+    "growth_trends": {
+      "members_by_month": [
+        {"month": "2024-01", "count": 221},
+        {"month": "2024-02", "count": 233},
+        {"month": "2024-03", "count": 245}
+      ],
+      "teams_by_month": [
+        {"month": "2024-01", "count": 16},
+        {"month": "2024-02", "count": 17},
+        {"month": "2024-03", "count": 18}
+      ]
+    },
+    "pending_actions": {
+      "pending_approvals": 12,
+      "pending_song_edits": 3,
+      "unassigned_meetings": 2
+    }
+  }
+}
+```
+
+### Key Metrics Explained
+
+<ResponseField name="member_retention_rate" type="number">
+  Percentage of active members vs. total members
+</ResponseField>
+
+<ResponseField name="engagement_rate" type="number">
+  Percentage of members actively involved in teams
+</ResponseField>
+
+<ResponseField name="average_team_size" type="number">
+  Average number of members per team
+</ResponseField>
+
+---
+
+## Church Context Resolution
+
+For non-super admins, church_id is resolved automatically:
+
+1. **Query parameter**: `church_id` or `churchId`
+2. **User's church**: From authenticated member data
+3. **Required**: Returns 400 error if church cannot be determined
+
+---
+
+## Database Status Monitoring
+
+All report responses include database health status:
+
+### Status Values
+
+| Status | Description |
+|--------|-------------|
+| `online` | Database is connected and responsive |
+| `error` | Database connection failed or timeout |
+
+### Example Status Check
+
+```json
+{
+  "db_status": {
+    "main": "online",
+    "music": "error"
+  }
+}
+```
+
+<Warning>
+  If `music` database shows "error", song and playlist functionality may be degraded.
+</Warning>
+
+---
+
+## Report Types Comparison
+
+| Report | Audience | Focus | Church-Specific |
+|--------|----------|-------|----------------|
+| Dashboard Stats | All roles | General metrics | Yes |
+| Pastor Stats | Leadership | Ministry insights | Yes |
+| Global Stats | Super Admin | Platform-wide | No |
+
+---
+
+## Use Cases
+
+### Monthly Ministry Review
+
+Use pastor stats to review:
+- Member growth trends
+- Team engagement rates
+- Upcoming events planning
+- Pending approvals
+
+```bash
+curl -X GET "https://your-domain.com/api/reports/pastor_stats?church_id=1" \
+  -H "Authorization: Bearer YOUR_TOKEN"
+```
+
+### Platform Health Check (Admin)
+
+Use global stats to monitor:
+- All churches status
+- System-wide metrics
+- Database health
+- Storage usage
+
+```bash
+curl -X GET https://your-domain.com/api/reports \
+  -H "Authorization: Bearer YOUR_TOKEN"
+```
+
+### Dashboard Widget
+
+Use dashboard stats for quick overview:
+- Active member count
+- Upcoming meetings
+- Recent activity
+
+```bash
+curl -X GET "https://your-domain.com/api/reports?church_id=1" \
+  -H "Authorization: Bearer YOUR_TOKEN"
+```
+
+---
+
+## Error Responses
+
+**Missing Church Context (400)**
+```json
+{
+  "success": false,
+  "error": "Church ID required"
+}
+```
+
+**Forbidden Access (403)**
+```json
+{
+  "success": false,
+  "error": "Church context required for dashboard"
+}
+```
+
+---
+
+## Error Codes
+
+| Code | Description |
+|------|-------------|
+| 400 | Bad Request - Missing church_id for non-super admins |
+| 401 | Unauthorized - Invalid or missing token |
+| 403 | Forbidden - Insufficient permissions or missing church context |
+| 500 | Internal Server Error |
+
+---
+
+## Performance Notes
+
+- Reports are calculated in real-time
+- Large churches (500+ members) may see 1-2 second response times
+- Consider caching results for 5-15 minutes on the client side
+- Global stats are more expensive to compute
+
+---
+
+## Related APIs
+
+<CardGroup cols={2}>
+  <Card title="Churches" icon="building-columns" href="/api/churches">
+    Manage church organizations
+  </Card>
+  <Card title="People" icon="user-group" href="/api/people">
+    View detailed member data
+  </Card>
+  <Card title="Teams" icon="users" href="/api/teams">
+    Analyze team engagement
+  </Card>
+  <Card title="Calendar" icon="calendar" href="/api/calendar">
+    Review upcoming events
+  </Card>
+</CardGroup>

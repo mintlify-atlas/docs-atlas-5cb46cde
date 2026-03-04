@@ -1,0 +1,353 @@
+---
+title: People Management
+description: Organize members, manage teams, and coordinate volunteers with comprehensive people directory and role assignment
+icon: users
+---
+
+The People Management module provides a centralized directory for your church members, volunteers, and staff. Organize people into areas and teams, manage roles and permissions, and maintain detailed contact information.
+
+## Member Directory
+
+Access your complete church directory from **Church Center → People**. The directory displays:
+
+- Full name and contact information
+- Current role and status (Active, Inactive, Pending)
+- Team and area assignments
+- Last login and activity information
+
+<Info>
+Members only see directory information for their own church. Master users can view directories across all organizations.
+</Info>
+
+## Inviting New Members
+
+Administrators with the `users.invite` permission can add new people to the church:
+
+### Single Invitation
+
+1. Navigate to **People → Invite Member**
+2. Enter the person's name and email address
+3. Assign an initial role (Admin, Leader, Member)
+4. Click **Send Invitation**
+
+The new member receives an email with:
+
+- Welcome message with church name
+- Secure invitation token (valid for 48 hours)
+- Link to complete their profile setup
+- Their assigned role information
+
+<Tip>
+Personalize the invitation email by ensuring your church name and contact information are current in church settings.
+</Tip>
+
+### Bulk Invitation
+
+For onboarding multiple people at once:
+
+1. Go to **People → Bulk Invite**
+2. Enter multiple email addresses (one per line or comma-separated)
+3. Choose the default role for all invitees
+4. Click **Send Invitations**
+
+The system:
+
+- Validates each email address
+- Checks for existing members to avoid duplicates
+- Generates unique invitation tokens for each person
+- Sends individual invitation emails
+- Reports success and failure counts
+
+**Bulk Invitation Results**  
+After processing, you'll see:
+- Number of successful invitations sent
+- Number of failed invitations (invalid emails or duplicates)
+- List of any emails that couldn't be processed
+
+## Invitation Management
+
+### Token Security
+
+Invitation tokens are:
+
+- **Cryptographically secure**: Generated using random bytes and SHA-256 hashing
+- **Time-limited**: Expire after 48 hours
+- **Single-use**: Consumed when the member completes setup
+- **Church-specific**: Scoped to the inviting church only
+
+### Pending Members
+
+Invited members appear in the directory with **Pending** status until they:
+
+1. Click the invitation link in their email
+2. Set their password
+3. Complete their profile information
+4. Are approved by an administrator (if approval workflow is enabled)
+
+Administrators can:
+
+- Resend expired invitations
+- Delete pending invitations that are no longer needed
+- View when invitations were sent and by whom
+
+## Member Approval Workflow
+
+For churches requiring administrator approval before full access:
+
+### Approval Process
+
+1. New member completes invitation signup
+2. Administrator receives notification of pending approval
+3. Administrator reviews the member's information
+4. Administrator assigns final role and status
+5. Member receives confirmation and gains access
+
+<Warning>
+Unapproved members have limited access until an administrator completes the approval process.
+</Warning>
+
+## Role Management
+
+### Assigning Roles
+
+Administrators can change member roles at any time:
+
+1. Open the member's profile from the directory
+2. Click **Change Role**
+3. Select new role (Admin, Leader, Member)
+4. Confirm the change
+
+Role changes take effect immediately and apply to all modules and permissions.
+
+### Updating Member Status
+
+Control member access by changing their status:
+
+- **Active**: Full access to the platform based on role
+- **Inactive**: Login disabled but record preserved
+- **Pending**: Awaiting invitation completion or approval
+
+Status changes are logged in the activity audit trail.
+
+## Profile Management
+
+### Editing Profiles
+
+Members can edit their own profiles:
+
+- Contact information (email, phone)
+- Personal details (bio, photo)
+- Notification preferences
+- Language and theme settings
+
+Administrators can edit any member's profile for data maintenance.
+
+### Profile Security
+
+<CardGroup cols={2}>
+  <Card title="Self-Service" icon="user">
+    Members can only edit their own profile information, ensuring data privacy and user autonomy.
+  </Card>
+  
+  <Card title="Admin Override" icon="user-shield">
+    Administrators and Master users can edit any profile for data correction or maintenance needs.
+  </Card>
+</CardGroup>
+
+## Teams and Areas
+
+### Organizational Structure
+
+Organize your church into a hierarchy:
+
+**Church → Areas → Teams → Members**
+
+**Areas** represent major departments or ministries:
+- Worship & Arts
+- Technical Production
+- Hospitality & Welcome
+- Children's Ministry
+- Administration
+
+**Teams** are specific groups within areas:
+- Worship Area → Singers Team, Musicians Team, Sound Team
+- Hospitality Area → Ushers Team, Greeters Team, Coffee Team
+
+### Assigning Members to Teams
+
+1. Open the team management page
+2. Click **Add Member**
+3. Select members from the directory
+4. Assign roles within the team (Leader or Member)
+5. Save assignments
+
+Members can belong to multiple teams across different areas.
+
+### Team Leaders
+
+Team leaders have elevated permissions within their teams:
+
+- View all team member contact information
+- Create and assign team events
+- Manage team-specific content (e.g., setlists for worship team)
+- Coordinate schedules and volunteer rotations
+
+Team leader permissions are scoped—they don't gain church-wide admin access.
+
+## Activity Logging
+
+All people management actions are logged for accountability:
+
+- Member invitations sent
+- Role changes
+- Status updates
+- Profile modifications
+- Team assignments
+
+Logs include:
+
+- Timestamp of action
+- Administrator who performed the action
+- Target member affected
+- Type of change made
+
+Administrators can view activity logs from **Church Center → Reports → Activity**.
+
+## Filtering and Search
+
+### Search Members
+
+Quickly find members using the search bar:
+
+- Search by name, email, or phone number
+- Results update as you type
+- Fuzzy matching helps find members even with slight misspellings
+
+### Filter Options
+
+<Tabs>
+  <Tab title="By Status">
+    Show only Active, Inactive, or Pending members to focus on specific groups.
+  </Tab>
+  
+  <Tab title="By Role">
+    Filter to see only Admins, Leaders, or Members.
+  </Tab>
+  
+  <Tab title="By Area">
+    View members assigned to specific ministry areas.
+  </Tab>
+  
+  <Tab title="By Team">
+    See the roster for individual teams.
+  </Tab>
+</Tabs>
+
+Combine multiple filters for precise results (e.g., "Active Leaders in Worship Area").
+
+## Deleting Members
+
+### Invitation Deletion
+
+Delete pending invitations that haven't been accepted:
+
+1. Find the pending member in the directory
+2. Click **Delete Invitation**
+3. Confirm deletion
+
+This removes the pending record and invalidates the invitation token.
+
+### Hard Delete
+
+Users with the `users.delete` permission can permanently remove members:
+
+<Warning>
+**Hard delete is permanent and irreversible.** Member records, activity history, and all associated data are removed from the database.
+
+Use **Inactive** status instead of deletion to preserve records while disabling access.
+</Warning>
+
+Before deleting:
+
+- Verify the member is no longer associated with teams or events
+- Consider exporting or archiving important information
+- Confirm the action with a second administrator if possible
+
+## Email Communications
+
+All automated emails sent to members include:
+
+- Church branding (name and logo)
+- Professional "Church Center" signature
+- Clear call-to-action buttons
+- Support contact information
+
+### Email Types
+
+**Invitation Email**  
+Sent when a member is invited. Contains secure setup link and role information.
+
+**Approval Notification**  
+Sent when a pending member is approved by an administrator.
+
+**Role Change Notification**  
+Informs members when their role or permissions change.
+
+**Event Assignment**  
+Notifies members when they're assigned to meetings or services.
+
+<Tip>
+Email templates support customization for multilingual churches. Interface language preferences determine which template is used.
+</Tip>
+
+## reCAPTCHA Integration
+
+Member signup and login forms include invisible reCAPTCHA v3:
+
+- Prevents automated bot registrations
+- No user interaction required (invisible)
+- Protects against brute-force attacks
+- Maintains smooth user experience
+
+This security layer protects your church's member data without adding friction to the signup process.
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Use Areas to Reflect Ministry Structure">
+    Align your areas with how your church actually operates. This makes reporting and team coordination much more natural.
+  </Accordion>
+  
+  <Accordion title="Assign Team Leaders Early">
+    Give team leaders their role before inviting team members. This allows them to help with onboarding and team building.
+  </Accordion>
+  
+  <Accordion title="Keep Contact Information Current">
+    Encourage members to update their own profiles. Schedule periodic reviews to verify contact information accuracy.
+  </Accordion>
+  
+  <Accordion title="Use Inactive Status Instead of Deletion">
+    Preserve historical records by marking members inactive rather than deleting them. This maintains activity logs and reporting accuracy.
+  </Accordion>
+  
+  <Accordion title="Review Pending Members Regularly">
+    Check for pending invitations weekly. Resend expired invitations or remove obsolete ones to keep the directory clean.
+  </Accordion>
+  
+  <Accordion title="Leverage Bulk Invite for Events">
+    When onboarding large groups (new member classes, volunteer orientations), use bulk invite to save time and ensure consistency.
+  </Accordion>
+</AccordionGroup>
+
+## Permissions Reference
+
+| Permission | Description | Typical Roles |
+|-----------|-------------|---------------|
+| `users.invite` | Send member invitations | Admin, Leader |
+| `users.approve` | Approve pending members and change roles | Admin |
+| `users.delete` | Permanently delete member records | Admin only |
+| `church.update` | View and edit church member directory | Admin, Master |
+
+<Note>
+Permissions are cumulative. Admins and Master users inherit all lower-level permissions automatically.
+</Note>

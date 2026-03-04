@@ -1,0 +1,705 @@
+---
+title: "Database Architecture"
+description: "MySQL schema design, PDO usage, and multi-database strategy for MinistryHub"
+---
+
+## Overview
+
+MinistryHub uses **MySQL** as its relational database with a **multi-database architecture** to separate concerns and optimize for different data access patterns.
+
+---
+
+## Database Strategy
+
+### Multi-Database Separation
+
+MinistryHub splits data into logical databases:
+
+| Database | Purpose | Key Tables |
+|----------|---------|------------|
+| **Main** | User management, authentication, multi-tenancy | `members`, `churches`, `roles`, `permissions` |
+| **Music** | Worship content and setlists | `songs`, `playlists`, `instruments`, `song_edits` |
+
+**Benefits:**
+- **Performance**: Smaller indexes, faster queries
+- **Scalability**: Can move databases to separate servers
+- **Security**: Isolate sensitive user data from content
+- **Maintenance**: Easier backups and migrations
+
+### Configuration
+
+```ini title="backend/config/database.env"
+# Main Database
+DB_HOST=localhost
+DB_USER=ministryhub_user
+DB_PASS=secure_password
+DB_NAME=ministryhub_main
+DB_PORT=3306
+
+# Music Database
+MUSIC_DB_HOST=localhost
+MUSIC_DB_USER=ministryhub_user
+MUSIC_DB_PASS=secure_password
+MUSIC_DB_NAME=ministryhub_music
+
+# Security
+JWT_SECRET=your-256-bit-secret
+RECAPTCHA_SECRET_KEY=your-recaptcha-key
+```
+
+---
+
+## Database Connection Management
+
+### Singleton Pattern with Multi-Config
+
+```php title="backend/src/Database.php"
+<?php
+
+namespace App;
+
+use PDO;
+use PDOException;
+use App\Helpers\Logger;
+
+class Database
+{
+    private static $instances = [];
+    private static $cachedEnv = null;
+    private $conn;
+
+    private function __construct($configKey = 'main')
+    {
+        // Cache the .env file to avoid repeated disk reads
+        if (self::$cachedEnv === null) {
+            $configPath = APP_ROOT . DIRECTORY_SEPARATOR . 'config' . DIRECTORY_SEPARATOR . 'database.env';
+            
+            if (!file_exists($configPath)) {
+                Logger::error("Database Configuration file not found at: " . $configPath);
+                throw new \Exception("Database configuration missing.");
+            }
+            
+            self::$cachedEnv = parse_ini_file($configPath);
+        }
+
+        $env = self::$cachedEnv;
+
+        // Select configuration based on key
+        if ($configKey === 'main') {
+            $host = $env['DB_HOST'] ?? '';
+            $user = $env['DB_USER'] ?? '';
+            $pass = $env['DB_PASS'] ?? '';
+            $name = $env['DB_NAME'] ?? '';
+            $port = $env['DB_PORT'] ?? '3306';
+        } elseif ($configKey === 'music') {
+            $host = $env['MUSIC_DB_HOST'] ?? '';
+            $user = $env['MUSIC_DB_USER'] ?? '';
+            $pass = $env['MUSIC_DB_PASS'] ?? '';
+            $name = $env['MUSIC_DB_NAME'] ?? '';
+            $port = $env['DB_PORT'] ?? '3306';
+        }
+
+        if (empty($host) || empty($user) || empty($name)) {
+            Logger::error("Database Configuration is missing required keys for: $configKey");
+            throw new \Exception("Database configuration malformed for $configKey.");
+        }
+
+        try {
+            $dsn = "mysql:host=$host;port=$port;dbname=$name;charset=utf8mb4";
+            $this->conn = new PDO($dsn, $user, $pass);
+            
+            // Security and error handling
+            $this->conn->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+            $this->conn->setAttribute(PDO::ATTR_DEFAULT_FETCH_MODE, PDO::FETCH_ASSOC);
+        } catch (PDOException $e) {
+            Logger::error("Database Connection Error ($configKey): " . $e->getMessage());
+            throw new \Exception("Database connection failed for $configKey.");
+        }
+    }
+
+    public static function getInstance($configKey = 'main')
+    {
+        // Create one instance per database
+        if (!isset(self::$instances[$configKey])) {
+            self::$instances[$configKey] = new self($configKey);
+        }
+        return self::$instances[$configKey]->conn;
+    }
+}
+```
+
+### Key Features
+
+<AccordionGroup>
+  <Accordion title="Singleton Per Database">
+    Each database (`main`, `music`) gets exactly one connection per request:
+    ```php
+    $mainDb = Database::getInstance('main');   // First call: creates connection
+    $mainDb2 = Database::getInstance('main');  // Reuses same connection
+    $musicDb = Database::getInstance('music'); // Creates separate connection
+    ```
+  </Accordion>
+
+  <Accordion title="Configuration Caching">
+    The `.env` file is read once and cached in `$cachedEnv`:
+    ```php
+    if (self::$cachedEnv === null) {
+        self::$cachedEnv = parse_ini_file($configPath);
+    }
+    ```
+    This prevents repeated file I/O on every query.
+  </Accordion>
+
+  <Accordion title="UTF-8 Support">
+    ```php
+    $dsn = "mysql:host=$host;dbname=$name;charset=utf8mb4";
+    ```
+    `utf8mb4` supports full Unicode including emojis.
+  </Accordion>
+
+  <Accordion title="Exception Mode">
+    ```php
+    $this->conn->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+    ```
+    Errors throw exceptions instead of returning `false`, enabling try/catch blocks.
+  </Accordion>
+
+  <Accordion title="Associative Fetch">
+    ```php
+    $this->conn->setAttribute(PDO::ATTR_DEFAULT_FETCH_MODE, PDO::FETCH_ASSOC);
+    ```
+    Results return as `['column' => 'value']` instead of numeric indexes.
+  </Accordion>
+</AccordionGroup>
+
+---
+
+## Repository Pattern
+
+All database queries are encapsulated in **Repository classes** to separate data access from business logic.
+
+### Example: Song Repository
+
+```php title="backend/src/Repositories/SongRepo.php"
+<?php
+
+namespace App\Repositories;
+
+use App\Database;
+use PDO;
+
+class SongRepo
+{
+    /**
+     * Get all songs for a church (includes global songs with church_id=0)
+     */
+    public static function getAll($churchId = null)
+    {
+        $db = Database::getInstance('music');
+
+        if ($churchId === null) {
+            // Superadmin: get ALL songs
+            $sql = "SELECT * FROM songs ORDER BY title ASC";
+            $stmt = $db->prepare($sql);
+        } else {
+            // Regular user: get church-specific + global songs
+            $sql = "SELECT * FROM songs 
+                    WHERE church_id = :church_id OR church_id = 0 
+                    ORDER BY title ASC";
+            $stmt = $db->prepare($sql);
+            $stmt->bindValue(':church_id', $churchId, PDO::PARAM_INT);
+        }
+
+        $stmt->execute();
+        return $stmt->fetchAll();
+    }
+
+    /**
+     * Get a single song by ID
+     */
+    public static function findById($id)
+    {
+        $db = Database::getInstance('music');
+        $sql = "SELECT * FROM songs WHERE id = :id LIMIT 1";
+        $stmt = $db->prepare($sql);
+        $stmt->bindValue(':id', $id, PDO::PARAM_INT);
+        $stmt->execute();
+        return $stmt->fetch();
+    }
+
+    /**
+     * Create a new song
+     */
+    public static function create($data)
+    {
+        $db = Database::getInstance('music');
+        $sql = "INSERT INTO songs (title, artist, lyrics, original_key, church_id, created_by) 
+                VALUES (:title, :artist, :lyrics, :key, :church_id, :created_by)";
+        
+        $stmt = $db->prepare($sql);
+        $stmt->bindValue(':title', $data['title']);
+        $stmt->bindValue(':artist', $data['artist']);
+        $stmt->bindValue(':lyrics', $data['lyrics']);
+        $stmt->bindValue(':key', $data['key']);
+        $stmt->bindValue(':church_id', $data['church_id'], PDO::PARAM_INT);
+        $stmt->bindValue(':created_by', $data['created_by'], PDO::PARAM_INT);
+        
+        $stmt->execute();
+        return $db->lastInsertId();
+    }
+
+    /**
+     * Update an existing song
+     */
+    public static function update($id, $data)
+    {
+        $db = Database::getInstance('music');
+        $sql = "UPDATE songs 
+                SET title = :title, artist = :artist, lyrics = :lyrics, original_key = :key 
+                WHERE id = :id";
+        
+        $stmt = $db->prepare($sql);
+        $stmt->bindValue(':id', $id, PDO::PARAM_INT);
+        $stmt->bindValue(':title', $data['title']);
+        $stmt->bindValue(':artist', $data['artist']);
+        $stmt->bindValue(':lyrics', $data['lyrics']);
+        $stmt->bindValue(':key', $data['key']);
+        
+        return $stmt->execute();
+    }
+
+    /**
+     * Delete a song
+     */
+    public static function delete($id)
+    {
+        $db = Database::getInstance('music');
+        $sql = "DELETE FROM songs WHERE id = :id";
+        $stmt = $db->prepare($sql);
+        $stmt->bindValue(':id', $id, PDO::PARAM_INT);
+        return $stmt->execute();
+    }
+}
+```
+
+### Repository Benefits
+
+| Benefit | Explanation |
+|---------|-------------|
+| **Reusability** | Query logic used by multiple controllers |
+| **Testability** | Can mock repositories in unit tests |
+| **Security** | Centralized prepared statements |
+| **Maintainability** | Schema changes only affect repositories |
+
+---
+
+## Security: Prepared Statements
+
+<Warning>
+  MinistryHub **NEVER** uses string concatenation for SQL queries. All queries use prepared statements.
+</Warning>
+
+### SQL Injection Prevention
+
+**BAD (Vulnerable):**
+```php
+// ❌ NEVER DO THIS
+$sql = "SELECT * FROM songs WHERE id = " . $_GET['id'];
+$result = $db->query($sql);
+```
+
+**GOOD (Prepared Statement):**
+```php
+// ✅ Always use prepared statements
+$sql = "SELECT * FROM songs WHERE id = :id";
+$stmt = $db->prepare($sql);
+$stmt->bindValue(':id', $_GET['id'], PDO::PARAM_INT);
+$stmt->execute();
+$result = $stmt->fetch();
+```
+
+### Named Parameters
+
+MinistryHub uses **named parameters** (`:name`) instead of positional (`?`) for clarity:
+
+```php
+$sql = "SELECT * FROM members 
+        WHERE email = :email AND church_id = :church_id";
+        
+$stmt = $db->prepare($sql);
+$stmt->bindValue(':email', $email);
+$stmt->bindValue(':church_id', $churchId, PDO::PARAM_INT);
+$stmt->execute();
+```
+
+### Type Binding
+
+```php
+// Integer binding (prevents type juggling attacks)
+$stmt->bindValue(':id', $id, PDO::PARAM_INT);
+
+// String binding (default)
+$stmt->bindValue(':name', $name); // Equivalent to PDO::PARAM_STR
+
+// Boolean binding
+$stmt->bindValue(':is_active', $isActive, PDO::PARAM_BOOL);
+```
+
+---
+
+## Schema Examples
+
+### Main Database Schema
+
+#### Members Table
+
+```sql
+CREATE TABLE members (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    church_id INT NOT NULL,
+    email VARCHAR(255) UNIQUE NOT NULL,
+    password_hash VARCHAR(255) NOT NULL,
+    name VARCHAR(255) NOT NULL,
+    phone VARCHAR(50),
+    role_id INT,
+    is_active TINYINT(1) DEFAULT 1,
+    invite_token VARCHAR(255),
+    invite_expires_at DATETIME,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    
+    INDEX idx_church (church_id),
+    INDEX idx_email (email),
+    INDEX idx_invite (invite_token),
+    FOREIGN KEY (church_id) REFERENCES churches(id) ON DELETE CASCADE
+);
+```
+
+#### Churches Table
+
+```sql
+CREATE TABLE churches (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(255) NOT NULL,
+    city VARCHAR(100),
+    country VARCHAR(100),
+    timezone VARCHAR(50) DEFAULT 'UTC',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+```
+
+#### Roles & Permissions
+
+```sql
+CREATE TABLE roles (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(50) NOT NULL,
+    church_id INT,
+    permissions JSON,  -- Stores permissions as JSON array
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    
+    FOREIGN KEY (church_id) REFERENCES churches(id) ON DELETE CASCADE
+);
+```
+
+### Music Database Schema
+
+#### Songs Table
+
+```sql
+CREATE TABLE songs (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    church_id INT DEFAULT 0,  -- 0 = global song
+    title VARCHAR(255) NOT NULL,
+    artist VARCHAR(255),
+    lyrics TEXT,
+    original_key VARCHAR(10),
+    ccli_number VARCHAR(50),
+    tags JSON,
+    created_by INT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    
+    INDEX idx_church (church_id),
+    INDEX idx_title (title),
+    FULLTEXT idx_search (title, artist, lyrics)
+);
+```
+
+#### Playlists (Setlists) Table
+
+```sql
+CREATE TABLE playlists (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    church_id INT NOT NULL,
+    name VARCHAR(255) NOT NULL,
+    date DATE,
+    songs JSON,  -- Array of song IDs with order
+    created_by INT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    
+    INDEX idx_church_date (church_id, date),
+    FOREIGN KEY (church_id) REFERENCES ministryhub_main.churches(id)
+);
+```
+
+---
+
+## Multi-Tenancy Strategy
+
+### Church Isolation
+
+Every table includes a `church_id` column for data isolation:
+
+```php
+// Users only see data from their church
+$sql = "SELECT * FROM songs WHERE church_id = :church_id";
+```
+
+### Global Resources
+
+Some resources are shared across all churches using `church_id = 0`:
+
+```sql
+-- Get church-specific + global songs
+SELECT * FROM songs 
+WHERE church_id = :church_id OR church_id = 0
+ORDER BY title;
+```
+
+### Superadmin Access
+
+Superadmins can bypass church filtering:
+
+```php
+public static function getAll($churchId = null)
+{
+    if ($churchId === null) {
+        // No filter: return ALL data
+        $sql = "SELECT * FROM songs";
+    } else {
+        // Filter by church
+        $sql = "SELECT * FROM songs WHERE church_id = :church_id";
+    }
+}
+```
+
+---
+
+## Query Performance
+
+### Indexing Strategy
+
+<Steps>
+  <Step title="Primary Keys">
+    All tables have `AUTO_INCREMENT` primary keys for fast lookups.
+  </Step>
+
+  <Step title="Foreign Key Indexes">
+    ```sql
+    INDEX idx_church (church_id)
+    ```
+    Speeds up multi-tenancy queries.
+  </Step>
+
+  <Step title="Unique Indexes">
+    ```sql
+    UNIQUE INDEX idx_email (email)
+    ```
+    Prevents duplicate users and enables fast login queries.
+  </Step>
+
+  <Step title="Composite Indexes">
+    ```sql
+    INDEX idx_church_date (church_id, date)
+    ```
+    Optimizes queries filtering by both church and date.
+  </Step>
+
+  <Step title="Full-Text Search">
+    ```sql
+    FULLTEXT idx_search (title, artist, lyrics)
+    ```
+    Enables fast song search:
+    ```php
+    $sql = "SELECT * FROM songs 
+            WHERE MATCH(title, artist, lyrics) AGAINST(:query IN NATURAL LANGUAGE MODE)";
+    ```
+  </Step>
+</Steps>
+
+### Query Optimization
+
+```php
+// Fetch only needed columns
+$sql = "SELECT id, title, artist FROM songs"; // Not SELECT *
+
+// Use LIMIT for pagination
+$sql = "SELECT * FROM songs LIMIT :offset, :limit";
+
+// Count efficiently
+$sql = "SELECT COUNT(*) as total FROM members WHERE church_id = :church_id";
+```
+
+---
+
+## Transactions
+
+For operations requiring multiple queries (e.g., creating a user + sending notification):
+
+```php
+public static function createMemberWithNotification($memberData, $notificationData)
+{
+    $db = Database::getInstance('main');
+    
+    try {
+        $db->beginTransaction();
+        
+        // Insert member
+        $sql = "INSERT INTO members (name, email, church_id) VALUES (:name, :email, :church_id)";
+        $stmt = $db->prepare($sql);
+        $stmt->execute([
+            ':name' => $memberData['name'],
+            ':email' => $memberData['email'],
+            ':church_id' => $memberData['church_id']
+        ]);
+        $memberId = $db->lastInsertId();
+        
+        // Insert notification
+        $sql = "INSERT INTO notifications (member_id, message) VALUES (:member_id, :message)";
+        $stmt = $db->prepare($sql);
+        $stmt->execute([
+            ':member_id' => $memberId,
+            ':message' => $notificationData['message']
+        ]);
+        
+        $db->commit();
+        return $memberId;
+        
+    } catch (\Exception $e) {
+        $db->rollBack();
+        Logger::error("Transaction failed: " . $e->getMessage());
+        throw $e;
+    }
+}
+```
+
+---
+
+## Database Migrations
+
+### Development Workflow
+
+1. **Create Migration SQL**
+   ```sql
+   -- migrations/001_add_song_tags.sql
+   ALTER TABLE songs ADD COLUMN tags JSON;
+   ```
+
+2. **Apply Manually**
+   ```bash
+   mysql -u user -p ministryhub_music < migrations/001_add_song_tags.sql
+   ```
+
+3. **Track in Version Control**
+   - All SQL files in `/User SQL/` and `/Music SQL/`
+   - Numbered sequentially for order
+
+### Production Deployment
+
+<Warning>
+  Always backup the database before running migrations in production.
+</Warning>
+
+```bash
+# Backup
+mysqldump -u user -p ministryhub_main > backup_main_$(date +%Y%m%d).sql
+
+# Apply migration
+mysql -u user -p ministryhub_main < migrations/002_add_permissions.sql
+```
+
+---
+
+## Error Handling
+
+### Exception Handling in Repositories
+
+```php
+public static function findByEmail($email)
+{
+    try {
+        $db = Database::getInstance('main');
+        $sql = "SELECT * FROM members WHERE email = :email AND is_active = 1";
+        $stmt = $db->prepare($sql);
+        $stmt->bindValue(':email', $email);
+        $stmt->execute();
+        return $stmt->fetch();
+    } catch (PDOException $e) {
+        Logger::error("Database error in findByEmail: " . $e->getMessage());
+        throw new \Exception("Database query failed");
+    }
+}
+```
+
+### Connection Failure Handling
+
+```php
+try {
+    $this->conn = new PDO($dsn, $user, $pass);
+} catch (PDOException $e) {
+    Logger::error("Database Connection Error ($configKey): " . $e->getMessage());
+    throw new \Exception("Database connection failed for $configKey.");
+}
+```
+
+Errors are logged to `backend/logs/app.log` and generic messages returned to the client.
+
+---
+
+## Best Practices
+
+<CardGroup cols={2}>
+  <Card title="Always Use Prepared Statements" icon="shield-check">
+    Never concatenate user input into SQL queries. Use `:named` parameters.
+  </Card>
+  
+  <Card title="Specify Column Types" icon="hashtag">
+    Use `PDO::PARAM_INT` for integers to prevent type juggling attacks.
+  </Card>
+  
+  <Card title="Fetch Only What You Need" icon="filter">
+    Avoid `SELECT *` in production. Specify columns explicitly.
+  </Card>
+  
+  <Card title="Index Foreign Keys" icon="bolt">
+    Every `church_id` or `member_id` column should have an index.
+  </Card>
+  
+  <Card title="Use Transactions" icon="arrows-rotate">
+    When multiple queries must succeed together, wrap them in a transaction.
+  </Card>
+  
+  <Card title="Log All Errors" icon="clipboard-list">
+    Database errors should be logged for debugging, never shown to users.
+  </Card>
+</CardGroup>
+
+---
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Request Lifecycle" icon="route" href="/technical/request-lifecycle">
+    See how database queries fit into the request flow
+  </Card>
+  <Card title="Security" icon="lock" href="/technical/security">
+    Learn about authentication and data protection
+  </Card>
+  <Card title="Technology Stack" icon="layer-group" href="/technical/stack">
+    Explore the full tech stack
+  </Card>
+  <Card title="API Reference" icon="code" href="/api/authentication">
+    View all available API endpoints
+  </Card>
+</CardGroup>

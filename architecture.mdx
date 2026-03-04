@@ -1,0 +1,547 @@
+---
+title: Architecture Overview
+description: Understanding MinistryHub's multi-hub architecture, folder structure, and technical implementation.
+---
+
+## The Multi-Hub Concept
+
+MinistryHub is built on the philosophy of **"The Right Tool for the Right Task"**. Instead of forcing all users into a single monolithic interface, the platform is divided into specialized hubs that serve specific ministry needs.
+
+<CardGroup cols={3}>
+  <Card title="Ministry Hub" icon="music">
+    Worship teams access song libraries, setlists, and musician assignments without cluttering their interface with administrative tools.
+  </Card>
+  <Card title="Social Media Hub" icon="megaphone">
+    Communication teams focus on media management and outreach without navigating unrelated features.
+  </Card>
+  <Card title="Church Center" icon="building-columns">
+    Administrators manage people, permissions, and reports with tools designed for organizational oversight.
+  </Card>
+</CardGroup>
+
+### Contextual Branding
+
+The platform automatically adapts its branding based on:
+- The hub you're currently using
+- Your role and permissions
+- The route you're accessing
+
+This creates a focused, purposeful experience for each user type.
+
+<Info>
+Users only see the hubs they have permission to access. A worship team member won't see administrative hubs unless they also have those roles.
+</Info>
+
+## Technology Stack
+
+### Frontend Architecture
+
+MinistryHub's frontend is built with modern, high-performance technologies:
+
+```json
+{
+  "framework": "React 19",
+  "bundler": "Vite 7",
+  "language": "TypeScript 5.9",
+  "routing": "React Router 7",
+  "styling": "Vanilla CSS with CSS Variables",
+  "internationalization": "i18next",
+  "http-client": "Axios",
+  "charts": "Recharts",
+  "music-processing": "ChordSheetJS 13.2"
+}
+```
+
+<Note>
+**Why Vanilla CSS?** MinistryHub uses a custom design system with CSS variables for high performance, native dark mode support, and premium micro-animations without the overhead of CSS-in-JS libraries.
+</Note>
+
+### Backend Architecture
+
+The backend is a professional, custom-built PHP micro-framework following PSR-4 standards:
+
+```php
+<?php
+// bootstrap.php - PSR-4 Autoloader
+spl_autoload_register(function ($class) {
+    $prefix = 'App\\';
+    $base_dir = __DIR__ . '/';
+
+    $len = strlen($prefix);
+    if (strncmp($prefix, $class, $len) !== 0) {
+        return;
+    }
+
+    $relative_class = substr($class, $len);
+    $file = $base_dir . str_replace('\\', '/', $relative_class) . '.php';
+
+    if (file_exists($file)) {
+        require $file;
+    }
+});
+```
+
+**Key Backend Features:**
+- **JWT Authentication**: Stateless token-based authentication
+- **Controller-Repository Pattern**: Clean separation of routing and data access
+- **Middleware System**: Centralized security filters (CORS, Auth, RBAC)
+- **PDO with Prepared Statements**: Complete SQL injection protection
+- **Global Exception Handler**: Centralized error logging and response
+
+### Database Design
+
+MinistryHub uses MySQL with multiple specialized schemas:
+
+<CardGroup cols={2}>
+  <Card title="User Schema" icon="database">
+    Members, roles, permissions, authentication, and invitation tokens.
+  </Card>
+  <Card title="Music Schema" icon="database">
+    Songs, chord sheets, setlists, instruments, and assignments.
+  </Card>
+  <Card title="Activity Schema" icon="database">
+    Audit logs tracking all system actions for compliance.
+  </Card>
+  <Card title="Calendar Schema" icon="database">
+    Meetings, services, notifications, and schedules.
+  </Card>
+</CardGroup>
+
+## Folder Structure
+
+MinistryHub follows a security-first folder architecture that separates public assets from private business logic:
+
+```text
+/ (Server Root)
+├── backend/                    # PRIVATE CORE (Inaccessible via URL)
+│   ├── config/
+│   │   └── database.env       # DB credentials, API keys
+│   ├── src/
+│   │   ├── Controllers/       # API route handlers
+│   │   │   ├── AuthController.php
+│   │   │   ├── SongController.php
+│   │   │   ├── ChurchController.php
+│   │   │   └── ...
+│   │   ├── Repositories/      # Data access layer
+│   │   │   ├── SongRepo.php
+│   │   │   ├── UserRepo.php
+│   │   │   └── ...
+│   │   ├── Helpers/           # Utilities
+│   │   │   ├── Response.php
+│   │   │   ├── Logger.php
+│   │   │   └── Cors.php
+│   │   ├── Middleware/        # Security filters
+│   │   ├── Database.php       # PDO connection manager
+│   │   └── Jwt.php           # Token encoding/decoding
+│   ├── logs/                  # Application logs
+│   └── bootstrap.php          # Autoloader & initialization
+│
+└── public_html/               # PUBLIC WEB ROOT
+    ├── assets/                # Compiled React build
+    │   ├── index.[hash].js
+    │   └── index.[hash].css
+    ├── api/
+    │   └── index.php         # Single API entry point
+    ├── .htaccess             # URL rewriting rules
+    └── index.html            # React SPA shell
+```
+
+<Warning>
+**Security Note**: The `backend/` folder must be placed **above** the web root (`public_html/`) to ensure it's never directly accessible via URL. This protects credentials, source code, and business logic.
+</Warning>
+
+## Request Lifecycle
+
+Here's how a typical request flows through MinistryHub:
+
+<Steps>
+  <Step title="Client Request">
+    A user navigates to `church.com/worship/songs` or makes an API call to `church.com/api/songs`.
+  </Step>
+  
+  <Step title=".htaccess Routing">
+    The `.htaccess` file intercepts the request:
+    
+    - If it matches `/api/*`, route to `api/index.php`
+    - Otherwise, serve `index.html` (React Router handles the route)
+    
+    ```apache
+    RewriteRule ^api/(.*)$ api/index.php?path=$1 [L,QSA]
+    RewriteCond %{REQUEST_FILENAME} !-f
+    RewriteRule ^ index.html [L]
+    ```
+  </Step>
+  
+  <Step title="API Entry Point">
+    `api/index.php` loads the backend bootstrap and parses the route:
+    
+    ```php
+    <?php
+    require_once __DIR__ . '/../../backend/src/bootstrap.php';
+    
+    $method = $_SERVER['REQUEST_METHOD'];
+    $pathParam = $_GET['path'] ?? '';
+    $parts = explode('/', trim($uri, '/'));
+    $resource = $parts[0] ?? '';  // e.g., "songs"
+    $action = $parts[1] ?? '';    // e.g., "123" or "new"
+    ```
+  </Step>
+  
+  <Step title="Authentication Middleware">
+    For protected routes, the AuthMiddleware validates the JWT token:
+    
+    ```php
+    // Extract token from Authorization header
+    $token = str_replace('Bearer ', '', $_SERVER['HTTP_AUTHORIZATION'] ?? '');
+    $payload = \App\Jwt::decode($token);
+    $memberId = $payload['uid'];
+    ```
+    
+    <Info>
+    Public routes like `/api/auth/login` bypass this middleware.
+    </Info>
+  </Step>
+  
+  <Step title="Controller Routing">
+    The request is routed to the appropriate controller:
+    
+    ```php
+    switch ($resource) {
+        case 'songs':
+            (new \App\Controllers\SongController())->handle($memberId, $action, $method);
+            break;
+        case 'churches':
+            (new \App\Controllers\ChurchController())->handle($memberId, $action, $method);
+            break;
+        // ...
+    }
+    ```
+  </Step>
+  
+  <Step title="Business Logic (Controller)">
+    The controller processes the request, validates permissions, and calls the repository:
+    
+    ```php
+    class SongController {
+        public function handle($memberId, $action, $method) {
+            if ($method === 'GET' && empty($action)) {
+                // Get all songs
+                $churchId = $this->getCurrentChurchId($memberId);
+                $songs = SongRepo::getAll($churchId);
+                Response::json(['songs' => $songs]);
+            }
+        }
+    }
+    ```
+  </Step>
+  
+  <Step title="Data Access (Repository)">
+    The repository executes database queries using PDO:
+    
+    ```php
+    class SongRepo {
+        public static function getAll($churchId = null) {
+            $db = Database::getInstance('music');
+            $sql = "SELECT * FROM songs WHERE is_active = 1";
+            $params = [];
+            
+            if ($churchId !== null) {
+                $sql .= " AND (church_id = ? OR church_id = 0)";
+                $params[] = $churchId;
+            }
+            
+            $stmt = $db->prepare($sql);
+            $stmt->execute($params);
+            return $stmt->fetchAll(PDO::FETCH_ASSOC);
+        }
+    }
+    ```
+    
+    <Note>
+    All queries use prepared statements for SQL injection prevention.
+    </Note>
+  </Step>
+  
+  <Step title="JSON Response">
+    The controller returns a JSON response:
+    
+    ```php
+    class Response {
+        public static function json($data, $status = 200) {
+            http_response_code($status);
+            header('Content-Type: application/json');
+            echo json_encode($data);
+            exit;
+        }
+    }
+    ```
+  </Step>
+</Steps>
+
+## Frontend Module Structure
+
+The React application is organized by feature modules:
+
+```text
+frontend/src/
+├── modules/
+│   ├── worship/              # Ministry Hub
+│   │   ├── pages/
+│   │   │   ├── WorshipDashboard.tsx
+│   │   │   ├── SongList.tsx
+│   │   │   ├── SongEditor.tsx
+│   │   │   └── Playlists.tsx
+│   │   └── components/
+│   ├── mainhub/              # Church Center
+│   │   ├── pages/
+│   │   │   ├── PeopleList.tsx
+│   │   │   ├── TeamsList.tsx
+│   │   │   └── Reports.tsx
+│   │   └── components/
+│   └── social/               # Social Media Hub
+│       └── pages/
+├── components/
+│   ├── layout/               # Shared layouts
+│   │   ├── MainLayout.tsx
+│   │   ├── ProtectedRoute.tsx
+│   │   └── ModuleGuard.tsx
+│   ├── ui/                   # Reusable components
+│   └── music/                # ChordPro rendering
+├── context/                  # React Context providers
+│   ├── AuthContext.tsx
+│   ├── ThemeContext.tsx
+│   └── ToastContext.tsx
+├── i18n/                     # Internationalization
+│   └── locales/
+│       ├── es.json
+│       ├── en.json
+│       └── pt.json
+└── App.tsx                   # Main routing
+```
+
+### Route Protection
+
+MinistryHub uses nested route protection:
+
+```tsx
+<Route element={<ProtectedRoute />}>
+  <Route element={<MainLayout />}>
+    {/* Worship Hub - Protected by ModuleGuard */}
+    <Route path="worship" element={<ModuleGuard moduleKey="worship" />}>
+      <Route index element={<WorshipDashboard />} />
+      <Route path="songs" element={<SongList />} />
+      <Route path="songs/:id" element={<SongDetail />} />
+    </Route>
+    
+    {/* Church Center - Protected by ModuleGuard */}
+    <Route path="mainhub" element={<ModuleGuard moduleKey="mainhub" />}>
+      <Route index element={<MainHubDashboard />} />
+      <Route path="people" element={<PeopleList />} />
+    </Route>
+  </Route>
+</Route>
+```
+
+- **ProtectedRoute**: Ensures user is authenticated (has valid JWT)
+- **ModuleGuard**: Verifies user has permission to access the specific hub
+- **MainLayout**: Provides consistent navigation and theme
+
+## Authentication Flow
+
+MinistryHub implements stateless JWT authentication:
+
+<Steps>
+  <Step title="User Login">
+    User submits credentials to `/api/auth/login`:
+    
+    ```typescript
+    const response = await axios.post('/api/auth/login', {
+      email: 'user@church.org',
+      password: 'securePassword',
+      recaptchaToken: '...'  // reCAPTCHA v3 token
+    });
+    ```
+  </Step>
+  
+  <Step title="Server Validation">
+    Backend verifies reCAPTCHA, checks credentials, and generates JWT:
+    
+    ```php
+    // Verify password
+    if (!password_verify($password, $user['password_hash'])) {
+        return Response::error("Credenciales inválidas", 401);
+    }
+    
+    // Generate JWT
+    $payload = [
+        'uid' => $user['member_id'],
+        'email' => $user['email'],
+        'iat' => time(),
+        'exp' => time() + 3600  // 1 hour expiration
+    ];
+    $token = Jwt::encode($payload);
+    ```
+  </Step>
+  
+  <Step title="Token Storage">
+    Frontend stores the JWT in localStorage:
+    
+    ```typescript
+    localStorage.setItem('auth_token', response.data.access_token);
+    ```
+  </Step>
+  
+  <Step title="Authenticated Requests">
+    All subsequent API calls include the JWT:
+    
+    ```typescript
+    axios.defaults.headers.common['Authorization'] = 
+      `Bearer ${localStorage.getItem('auth_token')}`;
+    ```
+  </Step>
+</Steps>
+
+<Warning>
+**Security Note**: JWTs expire after 1 hour. The frontend should handle token refresh or redirect to login when tokens expire.
+</Warning>
+
+## Build & Deployment
+
+### Development Environment
+
+```bash
+# Frontend
+cd frontend
+npm install
+npm run dev  # Vite dev server on http://localhost:5173
+
+# Backend
+# Configure backend/config/database.env with MySQL credentials
+# Run PHP development server or use Docker
+```
+
+### Production Build
+
+<Steps>
+  <Step title="Build Frontend">
+    ```bash
+    cd frontend
+    npm run build
+    ```
+    
+    This creates optimized assets in `frontend/dist/`:
+    - Code splitting for faster initial load
+    - Tree-shaking to remove unused code
+    - Asset minification and hashing
+  </Step>
+  
+  <Step title="Deploy to Server">
+    Upload files to your hosting:
+    
+    ```bash
+    # Move built frontend to public web root
+    frontend/dist/* → public_html/
+    
+    # Move backend above web root
+    backend/ → /backend/  (sibling of public_html)
+    ```
+  </Step>
+  
+  <Step title="Configure Database">
+    Import SQL schemas and configure `backend/config/database.env`:
+    
+    ```ini
+    DB_HOST=localhost
+    DB_NAME=ministryhub_main
+    DB_USER=your_user
+    DB_PASS=your_password
+    MUSIC_DB_NAME=ministryhub_music
+    ```
+  </Step>
+  
+  <Step title="Set Permissions">
+    Ensure the web server can write to logs:
+    
+    ```bash
+    chmod 755 backend/logs
+    ```
+  </Step>
+</Steps>
+
+## Performance Optimizations
+
+### Frontend
+
+- **Code Splitting**: Dynamic imports reduce initial bundle size
+- **Manual Chunks**: Heavy libraries (React, ChordSheetJS) are bundled separately
+- **Tree Shaking**: Unused exports are eliminated during build
+- **Asset Caching**: Hashed filenames enable long-term browser caching
+
+### Backend
+
+- **Database Indexing**: Optimized queries on frequently accessed columns
+- **Connection Pooling**: Reuse of database connections via PDO
+- **Query Optimization**: Prepared statements with parameter binding
+- **Error Logging**: File-based logging instead of database writes
+
+## Multi-Tenancy Implementation
+
+MinistryHub supports multiple churches with data isolation:
+
+```php
+// Repository pattern with church context
+public static function getAll($churchId = null) {
+    $sql = "SELECT * FROM songs WHERE is_active = 1";
+    
+    if ($churchId !== null) {
+        // Include church-specific AND universal songs (id 0)
+        $sql .= " AND (church_id = ? OR church_id = 0)";
+        $params[] = $churchId;
+    }
+    
+    $stmt = $db->prepare($sql);
+    $stmt->execute($params);
+    return $stmt->fetchAll(PDO::FETCH_ASSOC);
+}
+```
+
+<Info>
+**Universal Resources**: Songs, areas, and other resources with `church_id = 0` are available to all churches in the system.
+</Info>
+
+## Internationalization System
+
+All UI text is managed through JSON translation files:
+
+```typescript
+// i18n configuration
+import i18n from 'i18next';
+import { initReactI18next } from 'react-i18next';
+
+i18n
+  .use(initReactI18next)
+  .init({
+    resources: {
+      es: { translation: require('./locales/es.json') },
+      en: { translation: require('./locales/en.json') },
+      pt: { translation: require('./locales/pt.json') }
+    },
+    fallbackLng: 'es',
+    interpolation: { escapeValue: false }
+  });
+```
+
+Usage in components:
+
+```tsx
+import { useTranslation } from 'react-i18next';
+
+function Component() {
+  const { t } = useTranslation();
+  return <h1>{t('worship.songs.title')}</h1>;
+}
+```
+
+<Tip>
+Translation updates don't require code changes - just update the JSON files and redeploy.
+</Tip>
